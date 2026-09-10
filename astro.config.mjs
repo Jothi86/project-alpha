@@ -5,5 +5,5 @@ import { defineConfig } from 'astro/config';
 // If a custom domain is added later, point `site` at it.
 export default defineConfig({
   output: 'static',
-  site: 'https://project-alpha.pages.dev',
+  site: 'https://project-alpha-dlz.pages.dev',
 });
