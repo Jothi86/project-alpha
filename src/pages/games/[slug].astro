@@ -13,19 +13,20 @@ export async function getStaticPaths() {
 const { item } = Astro.props;
 const { Content } = await render(item);
 ---
-<Base title={`${item.data.title} — Jothi's Workshop`} description={item.data.summary}>
-  {item.data.status === 'coming-soon' && <span class="badge">Coming soon</span>}
-  <h1>{item.data.title}</h1>
-  <p class="lead">{item.data.summary}</p>
+<Base title={`${item.data.title} — Project Alpha`} description={item.data.summary} collection="games">
+  <div class="item-head">
+    {item.data.status === 'coming-soon' && <span class="badge">Coming soon</span>}
+    <h1>{item.data.title}</h1>
+    <p class="lead">{item.data.summary}</p>
+  </div>
 
   <div class="tags">
     {item.data.tags.map((t) => <span class="tag">{t}</span>)}
   </div>
 
   {(item.data.links.demo || item.data.links.repo) && (
-    <p>
+    <p class="item-links">
       {item.data.links.demo && <a href={item.data.links.demo}>Play it</a>}
-      {item.data.links.demo && item.data.links.repo && ' · '}
       {item.data.links.repo && <a href={item.data.links.repo}>Source</a>}
     </p>
   )}

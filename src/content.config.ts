@@ -16,7 +16,8 @@ const itemSchema = z.object({
   cover: z.string().optional(),
   links: z
     .object({
-      demo: z.url().optional(),
+      // Full URL, or a site-relative path for things hosted in public/ (e.g. /play/x.html).
+      demo: z.union([z.url(), z.string().regex(/^\/[^/]/)]).optional(),
       repo: z.url().optional(),
       other: z.url().optional(),
     })

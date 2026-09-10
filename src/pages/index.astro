@@ -12,47 +12,61 @@ const tools = (await getCollection('tools')).filter(isVisible);
 const projects = (await getCollection('projects')).filter(isVisible);
 
 const sections = [
-  { label: 'Games', href: `${base}/games/`, items: games },
-  { label: 'Tools', href: `${base}/tools/`, items: tools },
-  { label: 'Projects', href: `${base}/projects/`, items: projects },
+  { key: 'games', label: 'Games', glyph: '🎮', blurb: 'Things to play', items: games },
+  { key: 'tools', label: 'Tools', glyph: '🔧', blurb: 'Things that do a job', items: tools },
+  { key: 'projects', label: 'Projects', glyph: '🧪', blurb: 'Everything else', items: projects },
 ];
 
 const recent = [...games, ...tools, ...projects]
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
   .slice(0, 6);
+
+const when = (d: Date) =>
+  d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 ---
-<Base title="Jothi's Workshop">
-  <h1>Jothi's Workshop</h1>
+<Base title="Project Alpha">
+  <h1>Things I've been building.</h1>
   <p class="lead">
-    Games, tools, and projects, organized by what they are and what they're for.
-    Everything here is free to use.
+    Games, tools and side projects, sorted by what they actually are. Free to use —
+    take anything that's useful to you.
   </p>
 
-  <h2>Browse by type</h2>
-  <div class="grid">
+  <div class="tiles">
     {sections.map((s) => (
-      <a class="card" href={s.href}>
+      <a class="tile" href={`${base}/${s.key}/`} data-collection={s.key}>
+        <span class="glyph" aria-hidden="true">{s.glyph}</span>
         <h3>{s.label}</h3>
-        <p>{s.items.length} published</p>
+        <span class="count">
+          {s.items.length === 0 ? s.blurb : `${s.items.length} published`}
+        </span>
       </a>
     ))}
   </div>
 
   {recent.length > 0 && (
     <>
-      <h2>Recently published</h2>
-      <div class="grid">
+      <h2>Latest</h2>
+      <ul class="recent">
         {recent.map((item) => (
-          <a class="card" href={`${base}/${item.collection}/${item.id}/`}>
-            <h3>{item.data.title}</h3>
-            <p>{item.data.summary}</p>
-          </a>
+          <li data-collection={item.collection}>
+            <a href={`${base}/${item.collection}/${item.id}/`}>
+              <span class="dot" aria-hidden="true"></span>
+              <span class="title">{item.data.title}</span>
+              <span class="when">{when(item.data.date)}</span>
+              <span class="summary">{item.data.summary}</span>
+            </a>
+          </li>
         ))}
-      </div>
+      </ul>
     </>
   )}
 
   {recent.length === 0 && (
-    <div class="empty">Nothing published yet — the first thing to land here shows up automatically.</div>
+    <>
+      <h2>Latest</h2>
+      <div class="empty">
+        Nothing published yet. The first thing to land here shows up on its own.
+      </div>
+    </>
   )}
 </Base>
