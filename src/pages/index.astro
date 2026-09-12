@@ -1,0 +1,81 @@
+---
+import Base from '../layouts/Base.astro';
+import ItemCard from '../components/ItemCard.astro';
+import { getCollection } from 'astro:content';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const isVisible = (item: { data: { status: string } }) =>
+  item.data.status === 'live' || item.data.status === 'coming-soon';
+
+const games = (await getCollection('games')).filter(isVisible);
+const tools = (await getCollection('tools')).filter(isVisible);
+const projects = (await getCollection('projects')).filter(isVisible);
+
+const sections = [
+  { label: 'Games', href: `${base}/games/`, count: games.length },
+  { label: 'Tools', href: `${base}/tools/`, count: tools.length },
+  { label: 'Projects', href: `${base}/projects/`, count: projects.length },
+];
+
+type Accent = 'games' | 'tools' | 'projects';
+type CardEntry = {
+  href: string;
+  title: string;
+  summary: string;
+  tags: string[];
+  accent: Accent;
+  comingSoon: boolean;
+  date: Date;
+};
+
+const toCard = (collection: Accent, items: typeof games | typeof tools | typeof projects): CardEntry[] =>
+  items.map((i) => ({
+    href: `${base}/${collection}/${i.id}/`,
+    title: i.data.title,
+    summary: i.data.summary,
+    tags: i.data.tags,
+    accent: collection,
+    comingSoon: i.data.status === 'coming-soon',
+    date: i.data.date,
+  }));
+
+const recent = [...toCard('games', games), ...toCard('tools', tools), ...toCard('projects', projects)]
+  .sort((a, b) => b.date.getTime() - a.date.getTime())
+  .slice(0, 6);
+---
+<Base title="Jothi's Workshop">
+  <h1>Jothi's Workshop</h1>
+  <p class="lead">
+    Games, tools, and projects, organized by what they are and what they're for.
+    Everything here is free to use.
+  </p>
+
+  <div class="pill-nav">
+    {sections.map((s) => (
+      <a href={s.href}>{s.label} · {s.count}</a>
+    ))}
+  </div>
+
+  {recent.length > 0 && (
+    <>
+      <h2 class="section-title">Recently published</h2>
+      <div class="grid">
+        {recent.map((item) => (
+          <ItemCard
+            href={item.href}
+            title={item.title}
+            summary={item.summary}
+            tags={item.tags}
+            accent={item.accent}
+            comingSoon={item.comingSoon}
+          />
+        ))}
+      </div>
+    </>
+  )}
+
+  {recent.length === 0 && (
+    <div class="empty">Nothing published yet — the first thing to land here shows up automatically.</div>
+  )}
+</Base>

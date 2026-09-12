@@ -1,0 +1,31 @@
+---
+import Base from '../../layouts/Base.astro';
+import ItemCard from '../../components/ItemCard.astro';
+import { getCollection } from 'astro:content';
+
+const items = (await getCollection('tools'))
+  .filter((i) => i.data.status === 'live' || i.data.status === 'coming-soon')
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Base title="Tools — Jothi's Workshop">
+  <h1>Tools</h1>
+  <p class="lead">Utilities, automations, and things like the personal newsletter.</p>
+
+  {items.length === 0 && <div class="empty">No tools published yet.</div>}
+
+  <div class="grid">
+    {items.map((item) => (
+      <ItemCard
+        href={`${base}/tools/${item.id}/`}
+        title={item.data.title}
+        summary={item.data.summary}
+        tags={item.data.tags}
+        accent="tools"
+        extraTag={item.data.kind}
+        comingSoon={item.data.status === 'coming-soon'}
+      />
+    ))}
+  </div>
+</Base>

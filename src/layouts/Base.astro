@@ -1,0 +1,53 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'A catalog of games, tools, and projects.' } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <nav>
+          <a class="brand" href={`${base}/`}>
+            <span class="dot"></span>
+            Jothi's Workshop
+          </a>
+          <div class="navlinks">
+            <a href={`${base}/games/`}>Games</a>
+            <a href={`${base}/tools/`}>Tools</a>
+            <a href={`${base}/projects/`}>Projects</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+    <main>
+      <div class="wrap">
+        <slot />
+      </div>
+    </main>
+    <footer class="site">
+      <div class="wrap">
+        Everything here is free to use. Some things may add optional paid perks later.
+      </div>
+    </footer>
+  </body>
+</html>

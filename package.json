@@ -1,0 +1,20 @@
+{
+  "name": "project-alpha",
+  "version": "0.1.0",
+  "description": "Personal catalog site — games, tools, and projects, organized by type.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "astro": "^7.3.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "typescript": "^6.0.3"
+  }
+}

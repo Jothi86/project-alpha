@@ -1,0 +1,30 @@
+---
+import { gradientFor } from '../lib/gradient';
+
+interface Props {
+  href: string;
+  title: string;
+  summary: string;
+  tags: string[];
+  accent: 'games' | 'tools' | 'projects';
+  comingSoon?: boolean;
+  extraTag?: string;
+}
+
+const { href, title, summary, tags, accent, comingSoon = false, extraTag } = Astro.props;
+const initial = title.trim().charAt(0).toUpperCase();
+---
+<a class="card" href={href}>
+  <div class="thumb" style={{ background: gradientFor(title) }}>
+    {comingSoon && <span class="badge">Coming soon</span>}
+    <span class="initial">{initial}</span>
+  </div>
+  <div class="body">
+    <h3>{title}</h3>
+    <p>{summary}</p>
+    <div class="tags">
+      {extraTag && <span class={`tag accent-${accent}`}>{extraTag}</span>}
+      {tags.map((t) => <span class="tag">{t}</span>)}
+    </div>
+  </div>
+</a>
