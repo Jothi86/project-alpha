@@ -27,6 +27,7 @@ type CardEntry = {
   accent: Accent;
   comingSoon: boolean;
   date: Date;
+  cover?: string;
 };
 
 const toCard = (collection: Accent, items: typeof games | typeof tools | typeof projects): CardEntry[] =>
@@ -38,6 +39,7 @@ const toCard = (collection: Accent, items: typeof games | typeof tools | typeof 
     accent: collection,
     comingSoon: i.data.status === 'coming-soon',
     date: i.data.date,
+    cover: i.data.cover,
   }));
 
 const recent = [...toCard('games', games), ...toCard('tools', tools), ...toCard('projects', projects)]
@@ -69,6 +71,7 @@ const recent = [...toCard('games', games), ...toCard('tools', tools), ...toCard(
             tags={item.tags}
             accent={item.accent}
             comingSoon={item.comingSoon}
+            cover={item.cover}
           />
         ))}
       </div>

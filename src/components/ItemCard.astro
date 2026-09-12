@@ -9,15 +9,18 @@ interface Props {
   accent: 'games' | 'tools' | 'projects';
   comingSoon?: boolean;
   extraTag?: string;
+  cover?: string;
 }
 
-const { href, title, summary, tags, accent, comingSoon = false, extraTag } = Astro.props;
+const { href, title, summary, tags, accent, comingSoon = false, extraTag, cover } = Astro.props;
 const initial = title.trim().charAt(0).toUpperCase();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 <a class="card" href={href}>
-  <div class="thumb" style={{ background: gradientFor(title) }}>
+  <div class="thumb" style={cover ? undefined : { background: gradientFor(title) }}>
+    {cover && <img src={`${base}/${cover}`} alt="" loading="lazy" />}
     {comingSoon && <span class="badge">Coming soon</span>}
-    <span class="initial">{initial}</span>
+    {!cover && <span class="initial">{initial}</span>}
   </div>
   <div class="body">
     <h3>{title}</h3>

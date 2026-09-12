@@ -24,6 +24,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         tags={item.data.tags}
         accent="projects"
         comingSoon={item.data.status === 'coming-soon'}
+        cover={item.data.cover}
       />
     ))}
   </div>

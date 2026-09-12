@@ -4,6 +4,7 @@ summary: Neon arcade space shooter — blast and dodge asteroids, manage fuel, s
 status: live
 date: 2026-09-07
 tags: [arcade, shooter, canvas, 2-player]
+cover: covers/ember-drift.jpg
 links:
   demo: https://jothi86.github.io/project-alpha/play/ember-drift/
 ---
