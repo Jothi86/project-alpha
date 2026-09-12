@@ -15,7 +15,7 @@ const { item } = Astro.props;
 const { Content } = await render(item);
 const initial = item.data.title.trim().charAt(0).toUpperCase();
 ---
-<Base title={`${item.data.title} — Jothi's Workshop`} description={item.data.summary}>
+<Base title={`${item.data.title} — Project Alpha`} description={item.data.summary}>
   <div class="hero-thumb" style={{ background: gradientFor(item.data.title) }}>
     <span class="initial">{initial}</span>
   </div>
