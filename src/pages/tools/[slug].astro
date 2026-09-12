@@ -15,12 +15,24 @@ const { item } = Astro.props;
 const { Content } = await render(item);
 const initial = item.data.title.trim().charAt(0).toUpperCase();
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const hasPreview = Boolean(item.data.cover || item.data.embed);
 ---
 <Base title={`${item.data.title} — Project Alpha`} description={item.data.summary}>
-  <div class="hero-thumb" style={item.data.cover ? undefined : { background: gradientFor(item.data.title) }}>
-    {item.data.cover
-      ? <img src={`${base}/${item.data.cover}`} alt="" />
-      : <span class="initial">{initial}</span>}
+  <div
+    class={`hero-thumb${item.data.embed && !item.data.cover ? ' is-embed' : ''}`}
+    style={hasPreview ? undefined : { background: gradientFor(item.data.title) }}
+  >
+    {item.data.cover && <img src={`${base}/${item.data.cover}`} alt="" />}
+    {!item.data.cover && item.data.embed && (
+      <iframe
+        src={item.data.embed}
+        loading="lazy"
+        title={`Live preview of ${item.data.title}`}
+        referrerpolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+      />
+    )}
+    {!hasPreview && <span class="initial">{initial}</span>}
   </div>
 
   {item.data.status === 'coming-soon' && <span class="tag accent-tools">Coming soon</span>}

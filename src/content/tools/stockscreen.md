@@ -5,6 +5,7 @@ status: live
 date: 2026-08-28
 tags: [finance, stocks, screener, pwa]
 kind: finance
+embed: https://stockscreen-4yu.pages.dev
 links:
   demo: https://stockscreen-4yu.pages.dev
 ---

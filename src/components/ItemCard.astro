@@ -10,17 +10,30 @@ interface Props {
   comingSoon?: boolean;
   extraTag?: string;
   cover?: string;
+  embed?: string;
 }
 
-const { href, title, summary, tags, accent, comingSoon = false, extraTag, cover } = Astro.props;
+const { href, title, summary, tags, accent, comingSoon = false, extraTag, cover, embed } = Astro.props;
 const initial = title.trim().charAt(0).toUpperCase();
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const hasPreview = Boolean(cover || embed);
 ---
 <a class="card" href={href}>
-  <div class="thumb" style={cover ? undefined : { background: gradientFor(title) }}>
+  <div class="thumb" style={hasPreview ? undefined : { background: gradientFor(title) }}>
     {cover && <img src={`${base}/${cover}`} alt="" loading="lazy" />}
+    {!cover && embed && (
+      <iframe
+        src={embed}
+        loading="lazy"
+        tabindex="-1"
+        aria-hidden="true"
+        scrolling="no"
+        referrerpolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin"
+      />
+    )}
     {comingSoon && <span class="badge">Coming soon</span>}
-    {!cover && <span class="initial">{initial}</span>}
+    {!hasPreview && <span class="initial">{initial}</span>}
   </div>
   <div class="body">
     <h3>{title}</h3>

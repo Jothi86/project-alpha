@@ -13,6 +13,9 @@ const itemSchema = z.object({
   tier: z.enum(['free', 'paid']).default('free'),
   pricingNote: z.string().optional(),
   cover: z.string().optional(),
+  // A live, embeddable URL rendered as an iframe preview when there's no static `cover` —
+  // useful for something that's already hosted and responsive (see stockscreen.md).
+  embed: z.string().url().optional(),
   links: z
     .object({
       demo: z.string().url().optional(),

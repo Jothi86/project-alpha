@@ -26,6 +26,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         extraTag={item.data.kind}
         comingSoon={item.data.status === 'coming-soon'}
         cover={item.data.cover}
+        embed={item.data.embed}
       />
     ))}
   </div>
