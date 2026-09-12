@@ -18,7 +18,10 @@ const itemSchema = z.object({
   embed: z.string().url().optional(),
   links: z
     .object({
-      demo: z.string().url().optional(),
+      // Absolute URL for an external demo, or a root-relative path (e.g. "/play/x/")
+      // for something self-hosted in this same site's public/ — resolved against
+      // BASE_URL at render time so it survives a host/base-path change.
+      demo: z.string().optional(),
       repo: z.string().url().optional(),
       other: z.string().url().optional(),
     })

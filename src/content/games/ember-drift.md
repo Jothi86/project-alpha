@@ -6,7 +6,7 @@ date: 2026-09-07
 tags: [arcade, shooter, canvas, 2-player]
 cover: covers/ember-drift.jpg
 links:
-  demo: https://jothi86.github.io/project-alpha/play/ember-drift/
+  demo: /play/ember-drift/
 ---
 
 A single-seat hauler adrift in the belt. Shoot what you can, dodge what you can't, and

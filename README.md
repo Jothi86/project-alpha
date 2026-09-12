@@ -3,10 +3,17 @@
 A personal catalog: games, tools, and projects, organized by type. Built with
 [Astro](https://astro.build) content collections, styled dark and Roblox-inspired
 (rounded thumbnail card grid, colorful gradients, bold accents). Deployed as a static
-site to GitHub Pages by `.github/workflows/deploy-site.yml` on every push to `main`.
+site to Cloudflare Pages by `.github/workflows/deploy-cloudflare.yml` on every push to
+`main`.
 
-Live at: https://jothi86.github.io/project-alpha/ (once GitHub Pages is enabled in
-repo settings, which requires the repo to be public on the free plan)
+Live at whatever URL Cloudflare assigns the `project-alpha` Pages project (shown in
+the Cloudflare dashboard, and in that workflow's run output after the first deploy) —
+a custom domain can be attached there too.
+
+**One-time setup**: this workflow needs two repo secrets (Settings → Secrets and
+variables → Actions):
+- `CLOUDFLARE_API_TOKEN` — a token with Cloudflare Pages edit permission
+- `CLOUDFLARE_ACCOUNT_ID` — from the Cloudflare dashboard URL or account home
 
 ## Structure
 
@@ -17,13 +24,22 @@ src/content/tools/*.md    # one file per tool (a newsletter is `kind: newsletter
 src/content/projects/*.md # everything else
 src/components/ItemCard.astro
 src/lib/gradient.ts       # deterministic per-title gradient used as card "thumbnails"
+src/lib/links.ts          # resolves a stored link against BASE_URL (absolute passes
+                           # through; root-relative paths like /play/x/ get prefixed)
 src/pages/                # homepage + per-category listing + detail pages
+public/covers/            # static cover images referenced by content's `cover` field
+public/play/              # self-hosted playable builds (e.g. Ember Drift) referenced
+                           # via a root-relative `links.demo` path
 ```
 
 Every entry is one markdown file: YAML frontmatter for structured data, a markdown
 body for the human-readable description. `status: live` or `coming-soon` shows up on
 the site; `draft` and `example` never do. Every entry also has a `tier: free|paid`
 field, defaulted to `free` — a hook for a possible future paid tier, unused for now.
+
+A card/detail-page preview resolves in this order: a static `cover` image, then a live
+`embed` URL (rendered as an iframe — non-interactive on cards since they're links,
+interactive on the detail page), then a gradient-plus-initial placeholder.
 
 The three `example-*.md` files show the schema for each collection and are never
 rendered (`status: example`). Safe to delete once the first real entries exist, or
@@ -40,13 +56,7 @@ file.
 
 ```sh
 npm install
-npm run dev      # http://localhost:4321/project-alpha/
+npm run dev      # http://localhost:4321/
 npm run build    # outputs to dist/
 npm run check    # type-checks content against the schema
 ```
-
-## Hosting
-
-Currently a GitHub Pages project site, so every internal link is prefixed with the
-`/project-alpha` base path (see `astro.config.mjs`). If a custom domain is added
-later, drop `base` and point `site` at the new domain.

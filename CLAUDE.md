@@ -1,10 +1,11 @@
 # project-alpha
 
 A personal catalog website: games, tools, and projects, organized by type. Astro static
-site, deployed to GitHub Pages by `.github/workflows/deploy-site.yml` on every push to
-`main`. Live at https://jothi86.github.io/project-alpha/ (once GitHub Pages is enabled
-in repo settings — Settings → Pages → Source: GitHub Actions — which requires this repo
-to be public on the free plan).
+site, deployed to Cloudflare Pages by `.github/workflows/deploy-cloudflare.yml` on
+every push to `main` (needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repo
+secrets — see README.md). No base path: the site is served from its host's root, so
+self-hosted internal links use root-relative paths (`src/lib/links.ts` resolves these
+against `BASE_URL`) rather than a hardcoded domain.
 
 ## Publishing behavior
 
