@@ -84,6 +84,15 @@
   [hidden] { display: none !important; }
   button.install { padding: 8px 12px; font-size: 14px; border-radius: 999px; }
   button.install svg { width: 16px; height: 16px; }
+  .batch-toggle { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; margin: 0 0 16px; cursor: pointer; }
+  .batch-toggle input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--teal); flex: none; }
+  .tray {
+    position: sticky; bottom: 12px; z-index: 5; margin-top: 16px;
+    display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between;
+    background: var(--bg-raised); border: 1px solid var(--teal); border-radius: 16px; padding: 12px 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+  .tray .row { align-items: center; margin-left: auto; }
   .head-actions { display: flex; gap: 8px; align-items: center; }
   .share-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .share-grid a, .share-grid button {
@@ -172,8 +181,9 @@
   <section id="dest">
     <p class="label">Where your contacts go</p>
     <div id="dest-ask">
-      <p class="muted" style="margin-top:0">Sign in with the Google account your phone syncs contacts with, and each card is saved straight into it.</p>
+      <p class="muted" style="margin-top:0" id="dest-intro">Sign in with the Google account your phone syncs contacts with, and each card is saved straight into it.</p>
       <div class="row">
+        <button class="primary" id="use-iphone" hidden>Save to iPhone Contacts</button>
         <button class="primary" id="google-signin">Sign in with Google</button>
         <button id="use-file">Just give me a contact file</button>
       </div>
@@ -183,9 +193,12 @@
       <button class="link" id="dest-change">Change</button>
     </div>
     <div id="dest-file" class="where" hidden>
-      <div class="who">Each card downloads as a contact file. Tap it to save.</div>
+      <div class="who" id="dest-file-text">Cards download as a contact file. Open it to save.</div>
       <button class="link" id="dest-change-2">Change</button>
     </div>
+    <p class="muted" id="ios-google-tip" hidden style="margin-bottom:0">
+      iPhone with Google? Turn on contact sync once: <strong>Settings → Contacts → Accounts → Gmail → Contacts</strong>.
+    </p>
   </section>
 
   <div class="shoot">
@@ -200,9 +213,21 @@
       <input type="file" accept="image/*" multiple id="upload">
     </label>
   </div>
-  <p class="muted" style="margin:10px 0 16px">One card per photo works best. Two cards side by side, or the front and back of one card, also work.</p>
+  <p class="muted" style="margin:10px 0 12px">One card per photo works best. Two cards side by side, or the front and back of one card, also work.</p>
+  <label class="batch-toggle" id="batch-row" hidden>
+    <input type="checkbox" id="batch">
+    <span><strong>Batch mode</strong> — scan several cards, then add them all in one go</span>
+  </label>
 
   <div id="results"></div>
+
+  <div class="tray" id="tray" hidden>
+    <div><strong id="tray-count">0 cards</strong> <span class="muted">ready</span></div>
+    <div class="row">
+      <button class="link" id="tray-clear">Clear</button>
+      <button class="primary" id="tray-add">Add all to Contacts</button>
+    </div>
+  </div>
 
   <section style="margin-top:24px">
     <details id="tg">
@@ -255,17 +280,35 @@ const store = {
 
 // --- where contacts go ---
 
+// iPadOS reports itself as a Mac; touch support gives it away.
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 let mode = store.get('ncs.mode');          // 'google' | 'file' | null
 let email = store.get('ncs.email') || '';
 let token = null;                          // { value, until } — kept in memory only
+
+if (isIOS) {
+  // On iPhone the natural home is the iPhone's own Contacts (iCloud).
+  $('use-iphone').hidden = false;
+  $('use-file').hidden = true;
+  $('google-signin').classList.remove('primary');
+  $('google-signin').textContent = 'Save to Google Contacts';
+  $('dest-intro').textContent =
+    "Save cards to your iPhone's Contacts (iCloud), or to Google Contacts if your iPhone syncs with Google.";
+  $('dest-file-text').textContent = "Cards open Apple's Add Contact screen. Tap Add and they're in your iPhone Contacts.";
+  $('tray-add').textContent = 'Add all to iPhone Contacts';
+}
 
 function showDest() {
   $('dest-ask').hidden = !!mode;
   $('dest-google').hidden = mode !== 'google';
   $('dest-file').hidden = mode !== 'file';
   $('google-email').textContent = email || 'your Google Contacts';
+  $('ios-google-tip').hidden = !(isIOS && mode !== 'file');
+  $('batch-row').hidden = mode !== 'file';
+  if (mode !== 'file') clearTray();
 }
-showDest();
 
 let tokenClient;
 let tokenWaiters = [];
@@ -309,7 +352,7 @@ $('google-signin').onclick = async () => {
     mode = 'google'; store.set('ncs.mode', mode); showDest();
   } catch (err) { alertInline(err.message); }
 };
-$('use-file').onclick = () => { mode = 'file'; store.set('ncs.mode', mode); showDest(); };
+$('use-file').onclick = $('use-iphone').onclick = () => { mode = 'file'; store.set('ncs.mode', mode); showDest(); };
 $('dest-change').onclick = $('dest-change-2').onclick = () => {
   if (token && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(token.value, () => {});
   token = null; mode = null; email = '';
@@ -333,7 +376,71 @@ $('upload').onchange = (e) => { const f = [...e.target.files]; e.target.value = 
 
 async function handleFiles(files) {
   for (const file of files) await handlePhoto(file);
+  // Without batch mode, everything from this round goes out at once: one
+  // download elsewhere; on iPhone Safari needs a tap, so the tray waits for it.
+  if (mode === 'file' && !$('batch').checked && tray.length && !isIOS) sendTray();
 }
+
+// --- contact files and the tray ---
+
+// Cards waiting to go out as one contact file: [{ card, note, view }].
+let tray = [];
+
+const fileName = (cards) => cards.length > 1
+  ? `${cards.length} contacts.vcf`
+  : `${(cards[0].name || cards[0].organisation || 'contact').replace(/[\\/:*?"<>|]+/g, '').slice(0, 60)}.vcf`;
+
+// Hands a vCard to the phone. iPhone: post it to /api/vcard in a new tab so
+// Safari shows Apple's Add Contact / Add All Contacts screen (must run from a
+// tap). Elsewhere: a plain download the phone opens in its contacts app.
+function sendContacts(cards, note) {
+  const text = toVcard(cards, note);
+  if (isIOS) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/api/vcard';
+    form.target = '_blank';
+    const field = document.createElement('input');
+    field.type = 'hidden';
+    field.name = 'vcf';
+    field.value = text;
+    form.appendChild(field);
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/vcard' }));
+  a.download = fileName(cards);
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+function showTray() {
+  $('tray').hidden = !tray.length;
+  $('tray-count').textContent = `${tray.length} card${tray.length === 1 ? '' : 's'}`;
+}
+
+function sendTray() {
+  if (!tray.length) return;
+  sendContacts(tray.map((t) => t.card), tray[0].note);
+  tray.forEach((t) => t.view.sent());
+  tray = [];
+  showTray();
+}
+
+function clearTray() {
+  tray.forEach((t) => t.view.dropped());
+  tray = [];
+  showTray();
+}
+
+$('tray-add').onclick = sendTray;
+$('tray-clear').onclick = clearTray;
+$('batch').checked = !!store.get('ncs.batch');
+$('batch').onchange = () => store.set('ncs.batch', $('batch').checked);
+showDest();
 
 async function shrink(file) {
   const bitmap = await createImageBitmap(file).catch(() => null);
@@ -411,26 +518,37 @@ function renderCard(card, note) {
       <div class="lines">${lines.map(esc).join('<br>')}</div>
       ${card.note ? `<div class="warn">${esc(card.note)}</div>` : ''}
       <div class="status ${statusClass}">${statusHtml}</div>`;
-    el.querySelector('[data-act=file]')?.addEventListener('click', downloadFile);
+    el.querySelector('[data-act=file]')?.addEventListener('click', sendOne);
     el.querySelector('[data-act=google]')?.addEventListener('click', () => deliver(true));
     el.querySelector('[data-act=fix]')?.addEventListener('click', openFix);
   }
 
   const fixLink = '<button class="link" data-act="fix">Fix something</button>';
+  const againLabel = isIOS ? 'Add to Contacts again' : 'Download again';
+  const view = {
+    sent: () => draw(isIOS
+      ? `✓ Sent to Apple's Add Contact screen. Tap Add there. <button class="link" data-act="file">${againLabel}</button> ${fixLink}`
+      : `✓ Contact file downloaded. Open it to save. <button class="link" data-act="file">${againLabel}</button> ${fixLink}`, 'ok'),
+    dropped: () => draw(`Removed from the list. <button class="link" data-act="file">${isIOS ? 'Add to Contacts' : 'Download'}</button>`, ''),
+  };
 
-  function downloadFile() {
-    const blob = new Blob([toVcard([card], note)], { type: 'text/vcard' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${(card.name || card.organisation || 'contact').replace(/[\\/:*?"<>|]+/g, '').slice(0, 60)}.vcf`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  // This card on its own, straight away (always from a tap).
+  function sendOne() {
+    tray = tray.filter((t) => t.card !== card);
+    showTray();
+    sendContacts([card], note);
+    view.sent();
   }
 
   async function deliver(fromTap = false) {
     if (mode !== 'google') {
-      downloadFile();
-      draw(`✓ Contact file downloaded. Open it to save. <button class="link" data-act="file">Download again</button> ${fixLink}`, 'ok');
+      if (fromTap) return sendOne();
+      tray.push({ card, note, view });
+      showTray();
+      const batch = $('batch').checked;
+      draw(batch || isIOS
+        ? `In the list below. <button class="link" data-act="file">${isIOS ? 'Add just this one' : 'Download just this one'}</button> ${fixLink}`
+        : '<span class="spinner"></span> Preparing the contact file…', batch || isIOS ? '' : 'busy');
       return;
     }
     if (!haveToken()) {
@@ -463,7 +581,7 @@ function renderCard(card, note) {
     ];
     f.innerHTML = fields.map(([k, label, v]) =>
       `<label>${label}<input type="text" name="${k}" value="${esc(v || '')}"></label>`).join('') +
-      `<div class="row"><button class="primary" type="submit">${mode === 'google' ? 'Save again' : 'Download again'}</button></div>`;
+      `<div class="row"><button class="primary" type="submit">${mode === 'google' ? 'Save again' : againLabel}</button></div>`;
     f.onsubmit = (e) => {
       e.preventDefault();
       const v = Object.fromEntries(new FormData(f));
@@ -487,8 +605,6 @@ function renderCard(card, note) {
 // --- add to home screen ---
 
 const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 let installPrompt = null;
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
