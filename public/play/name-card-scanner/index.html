@@ -218,6 +218,9 @@
     <input type="checkbox" id="batch">
     <span><strong>Batch mode</strong> — scan several cards, then add them all in one go</span>
   </label>
+  <p class="muted" id="google-no-batch" hidden style="margin:0 0 16px">
+    Scanning lots of cards? Just keep shooting. Each one saves to Google on its own, so there's no batch step.
+  </p>
 
   <div id="results"></div>
 
@@ -306,8 +309,10 @@ function showDest() {
   $('dest-file').hidden = mode !== 'file';
   $('google-email').textContent = email || 'your Google Contacts';
   $('ios-google-tip').hidden = !(isIOS && mode !== 'file');
-  $('batch-row').hidden = mode !== 'file';
-  if (mode !== 'file') clearTray();
+  // Batch only matters for contact files; Google saves each card as it's read.
+  $('batch-row').hidden = mode === 'google';
+  $('google-no-batch').hidden = mode !== 'google';
+  if (mode === 'google') clearTray();
 }
 
 let tokenClient;
@@ -378,7 +383,7 @@ async function handleFiles(files) {
   for (const file of files) await handlePhoto(file);
   // Without batch mode, everything from this round goes out at once: one
   // download elsewhere; on iPhone Safari needs a tap, so the tray waits for it.
-  if (mode === 'file' && !$('batch').checked && tray.length && !isIOS) sendTray();
+  if (mode !== 'google' && !$('batch').checked && tray.length && !isIOS) sendTray();
 }
 
 // --- contact files and the tray ---
