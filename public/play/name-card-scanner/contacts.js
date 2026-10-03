@@ -2,6 +2,8 @@
 // straight from the browser with the visitor's own access token. A copy lives in
 // the chief-of-staff bot as contacts.mjs — keep the two in step.
 
+import { nameTokens, isRoleEmail } from './cardread.js';
+
 const PEOPLE = 'https://people.googleapis.com/v1';
 const FIELDS = 'names,emailAddresses,phoneNumbers,organizations,addresses,urls,biographies,memberships';
 const UPDATABLE = 'names,emailAddresses,phoneNumbers,organizations,addresses,urls,biographies';
@@ -84,14 +86,26 @@ async function search(token, query) {
   return (data.results || []).map((r) => r.person);
 }
 
-// The existing contact with the same email or phone number, or null.
+// The existing contact for this same person, or null. Only things that belong
+// to one person count: their mobile and their own email. Office lines, fax and
+// shared mailboxes (info@, secretariat@) are shared by colleagues; matching on
+// them merged different FMM and REHDA people into one contact (3 Oct 2026).
+// And if both have a readable name, the names must share a word.
 export async function findExisting(token, card) {
-  const emails = card.emails.map((e) => e.toLowerCase());
-  const phones = card.phones.filter((p) => p.type !== 'fax').map((p) => digits(p.number));
-  const queries = [...card.emails, ...card.phones.filter((p) => p.type !== 'fax').map((p) => p.number)];
+  const emails = card.emails.filter((e) => !isRoleEmail(e)).map((e) => e.toLowerCase());
+  const mobiles = card.phones.filter((p) => p.type === 'mobile');
+  const phones = mobiles.map((p) => digits(p.number));
+  const queries = [...emails, ...mobiles.map((p) => p.number)];
+  const cardWords = nameTokens(card.name);
+  const sameName = (person) => {
+    if (!cardWords.length) return true;
+    const theirs = (person.names || []).flatMap((n) => nameTokens(n.displayName));
+    return !theirs.length || theirs.some((w) => w.length >= 3 && cardWords.includes(w));
+  };
   const matches = (person) =>
-    (person.emailAddresses || []).some((e) => emails.includes(e.value.toLowerCase())) ||
-    (person.phoneNumbers || []).some((p) => phones.includes(digits(p.value)));
+    ((person.emailAddresses || []).some((e) => emails.includes(e.value.toLowerCase())) ||
+      (person.phoneNumbers || []).some((p) => phones.includes(digits(p.value)))) &&
+    sameName(person);
 
   for (const q of queries) {
     const hit = (await search(token, q)).find(matches);
@@ -124,9 +138,11 @@ const PHONE_TYPE = { mobile: 'mobile', office: 'work', fax: 'workFax', other: 'o
 function toPerson(card, note) {
   return {
     names: [{ givenName: card.name || card.organisation, honorificPrefix: card.honorific || undefined }],
-    organizations: card.organisation || card.title
-      ? [{ name: card.organisation, title: card.title, department: card.department || undefined }]
-      : [],
+    // Main job first, then any second job from the card's other side.
+    organizations: [
+      { name: card.organisation, title: card.title, department: card.department || undefined },
+      ...(card.roles || []).map((r) => ({ name: r.organisation, title: r.title })),
+    ].filter((o) => o.name || o.title),
     phoneNumbers: card.phones.map((p) => ({ value: p.number, type: PHONE_TYPE[p.type] || 'other' })),
     emailAddresses: card.emails.map((e) => ({ value: e, type: 'work' })),
     addresses: card.address ? [{ formattedValue: card.address, type: 'work' }] : [],
@@ -146,7 +162,9 @@ function merge(existing, fresh) {
   return {
     etag: existing.etag,
     names: existing.names?.length ? existing.names : fresh.names,
-    organizations: fresh.organizations.length ? fresh.organizations : existing.organizations || [],
+    // The card's jobs lead (they're the newest), but jobs already on the
+    // contact stay; overwriting them lost a title on 3 Oct 2026.
+    organizations: union(fresh.organizations, existing.organizations, (o) => (o.name || o.title || '').toLowerCase().replace(/[^a-z0-9]/g, '')),
     phoneNumbers: union(existing.phoneNumbers, fresh.phoneNumbers, (p) => digits(p.value)),
     emailAddresses: union(existing.emailAddresses, fresh.emailAddresses, (e) => e.value.toLowerCase()),
     addresses: union(existing.addresses, fresh.addresses, (a) => (a.formattedValue || '').toLowerCase()),

@@ -114,64 +114,151 @@ export async function readCard({ apiKey, base64, mimeType = 'image/jpeg' }) {
   return (parsed.cards || []).map(clean).filter((c) => c.name || c.organisation);
 }
 
+const latin = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const last9 = (n) => String(n).replace(/\D/g, '').slice(-9);
+
 function clean(c) {
   const s = (v) => (typeof v === 'string' ? v.trim() : '');
+  const honorific = s(c.honorific);
+  const organisation = s(c.organisation);
+  let name = s(c.name);
+
+  // The reader sometimes repeats the honorific inside the name
+  // ("DATO' SERI" + "DATO' SERI LEE TONG LI"); keep it in one place.
+  const h = latin(honorific);
+  if (h) {
+    const words = name.split(/\s+/);
+    for (let i = 1; i <= words.length; i++) {
+      if (latin(words.slice(0, i).join('')) === h) { name = words.slice(i).join(' '); break; }
+    }
+  }
+  // ...and sometimes puts the company in the name field of a company-only side.
+  if (latin(name) && latin(name) === latin(organisation)) name = '';
+
   return {
-    honorific: s(c.honorific),
-    name: s(c.name),
+    honorific,
+    name,
     title: s(c.title),
-    organisation: s(c.organisation),
+    organisation,
     department: s(c.department),
     phones: (c.phones || [])
-      .map((p) => ({ type: s(p.type) || 'other', number: s(p.number).replace(/[^\d+]/g, '') }))
+      .map((p) => {
+        let number = s(p.number).replace(/[^\d+]/g, '');
+        // "+60 6016..." -> "+6016...": the country code added twice.
+        if (/^\+6060\d{8,10}$/.test(number)) number = `+60${number.slice(5)}`;
+        let type = s(p.type) || 'other';
+        // Malaysian 01x numbers are mobiles, whatever the label said.
+        if (/^\+601\d{7,9}$/.test(number)) type = 'mobile';
+        return { type, number };
+      })
       .filter((p) => p.number),
-    emails: (c.emails || []).map(s).filter(Boolean),
+    emails: (c.emails || []).map(s).filter(Boolean).sort((p, q) => isRoleEmail(p) - isRoleEmail(q)),
     address: s(c.address),
     website: s(c.website),
     category: s(c.category) || 'Other',
     note: s(c.note),
     side: s(c.side) || 'single',
     other_names: s(c.other_names),
+    roles: [], // other jobs on the card's other side: [{ title, organisation }]
   };
 }
 
+// --- telling people apart -------------------------------------------------
+
+// Titles and particles that are not part of who someone is.
+const HONORIFICS = new Set(('ir dr ar ts sr dato datuk datin dato\' seri sri haji hj hajah hjh en encik pn puan cik ' +
+  'prof professor mr mrs ms mdm madam bin binti bte bt al ap pjk pjm djn pkt kmn amn ams bkt jp yb yab ybhg tuan')
+  .split(' '));
+// First names too common to identify anyone on their own.
+const COMMON = new Set('muhammad mohamad mohammad mohamed muhamad mohd abdul ahmad nurul siti nur'.split(' '));
+
+// The words of a person's name, minus titles: "Dato' Ir. Chan Soo How" -> chan, soo, how.
+export function nameTokens(name) {
+  return String(name || '').toLowerCase().split(/[^a-z]+/).filter((t) => t.length > 1 && !HONORIFICS.has(t));
+}
+
+// Shared mailboxes say nothing about who someone is.
+const ROLE_MAILBOX = /^(info|admin|sales|enquiry|enquiries|inquiry|inquiries|contact|contactus|hello|office|general|hr|marketing|support|secretariat|secretary|finance|account|accounts|customerservice|cs|reception|mail|noreply|service|services|team|corporate|pr|media|careers|jobs|billing|penang|kl|hq|admin\d*)$/;
+export const isRoleEmail = (e) => ROLE_MAILBOX.test(String(e).toLowerCase().split('@')[0].replace(/[^a-z0-9]/g, ''));
+
+// Does this email's mailbox name belong to this person? lai.kok.soon,
+// jessenang, soohow.chan, fongcf (surname + initials), drnajmilfaiz.
+export function emailMatchesName(email, name) {
+  const local = String(email).toLowerCase().split('@')[0].replace(/[^a-z]/g, '');
+  const t = nameTokens(name);
+  if (!local || !t.length || isRoleEmail(email)) return false;
+  const joined = t.join('');
+  if (local === joined) return true;
+  if (t.length > 1 && t.every((x) => local.includes(x)) && local.length <= joined.length + 2) return true;
+  for (const x of t) {
+    if (x.length < 3) continue;
+    const others = t.filter((y) => y !== x).map((y) => y[0]);
+    const initialsOnly = (rest) => rest.length >= 1 && rest.length <= 3 && [...rest].every((ch) => others.includes(ch));
+    if (local.startsWith(x) && initialsOnly(local.slice(x.length))) return true;
+    if (local.endsWith(x) && initialsOnly(local.slice(0, -x.length))) return true;
+    if (x.length >= 5 && !COMMON.has(x) && local.includes(x)) return true;
+  }
+  return false;
+}
+
+// Same company? Tolerates one name being the short form ("BMT" / "BMT Services
+// Sdn Bhd", "moon work 皓创…" / "moonwork DESIGN & BUILD").
+const ORG_NOISE = /(sdnbhd|sdn|bhd|berhad|pteltd|pte|ltd|plc|inc|group|holdings|malaysia)$/g;
+const orgKey = (x) => latin(String(x || '').replace(/\(\s*\d+[-\s]?[a-z]?\s*\)/gi, '')).replace(ORG_NOISE, '');
+export function orgsMatch(x, y) {
+  const a = orgKey(x);
+  const b = orgKey(y);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+  if (s.length >= 3 && l.startsWith(s)) return true;      // BMT / BMT Services
+  if (s.length >= 6 && l.includes(s)) return true;         // NF Prestige / INF Prestige (misread)
+  let common = 0;                                           // Manufacturing / Manufacturers
+  while (common < s.length && s[common] === l[common]) common++;
+  return common >= 8 && common >= s.length * 0.85;
+}
+
+const mobileNumbers = (c) => c.phones.filter((p) => p.type === 'mobile').map((p) => last9(p.number));
+const personalEmails = (c) => c.emails.filter((e) => !isRoleEmail(e)).map((e) => e.toLowerCase());
+const hasPersonalContact = (c) => mobileNumbers(c).length > 0 || personalEmails(c).length > 0;
+
 // --- front and back scanned as two photos ---
 
-const latin = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-const last9 = (n) => String(n).replace(/\D/g, '').slice(-9);
 export const OTHER_SIDE_WINDOW_MS = 3 * 60 * 1000;
 
 // Is `next` the other side of the card `prev`, scanned `ageMs` earlier?
 export function isOtherSide(prev, next, ageMs) {
   if (!prev || !next || ageMs > OTHER_SIDE_WINDOW_MS) return false;
 
-  // Two names in Latin script decide it on their own.
-  const a = latin(prev.name);
-  const b = latin(next.name);
+  // Two readable names decide it on their own: different people never merge.
+  const a = nameTokens(prev.name).sort().join(' ');
+  const b = nameTokens(next.name).sort().join(' ');
   if (a && b) return a === b;
+  if (!a && !b && prev.name && next.name) return prev.name === next.name; // e.g. both only in Chinese
 
-  // A personal number or email on both sides. Office and fax lines are
-  // shared by colleagues, so on their own they do not count.
-  const mobiles = (c) => c.phones.filter((p) => p.type === 'mobile').map((p) => last9(p.number));
-  const emails = (c) => c.emails.map((e) => e.toLowerCase());
-  if (mobiles(prev).some((m) => mobiles(next).includes(m))) return true;
-  if (emails(prev).some((e) => emails(next).includes(e))) return true;
+  // The same personal mobile or mailbox on both sides. Office lines and shared
+  // mailboxes (info@, secretariat@) belong to whole organisations, so they don't count.
+  if (mobileNumbers(prev).some((m) => mobileNumbers(next).includes(m))) return true;
+  if (personalEmails(prev).some((e) => personalEmails(next).includes(e))) return true;
 
-  // From here one side has no Latin-script name: typically the back, with the
-  // name in Chinese/Tamil or no person at all. Link it by the company.
+  // From here one side has no readable name: typically the back, with the name
+  // only in Chinese/Tamil, or the side with a second job and the person's own
+  // email. Tie it to the named side by the mailbox name, then by the company.
+  const [named, nameless] = a ? [prev, next] : [next, prev];
+  if (a || b) {
+    if (nameless.emails.some((e) => emailMatchesName(e, named.name))) return true;
+  }
   const otherNumbers = (c) => c.phones.filter((p) => p.type !== 'mobile').map((p) => last9(p.number));
-  const sameOrg = latin(prev.organisation) && latin(prev.organisation) === latin(next.organisation);
-  const sharedDomain = domains(prev).some((d) => domains(next).includes(d));
-  const sharedLine = otherNumbers(prev).some((n) => otherNumbers(next).includes(n));
-  if (sameOrg || sharedDomain || sharedLine) return true;
+  if (orgsMatch(prev.organisation, next.organisation)) return true;
+  if (domains(prev).some((d) => domains(next).includes(d))) return true;
+  if (otherNumbers(prev).some((n) => otherNumbers(next).includes(n))) return true;
 
-  // A side with no person on it at all (no Latin name, mobile or email) is a back.
-  const noPerson = (c) => !latin(c.name) && !mobiles(c).length && !c.emails.length;
+  // A side with no person on it at all (no name, mobile or own email) is a back.
+  const noPerson = (c) => !c.name && !hasPersonalContact(c);
   if (noPerson(prev) || noPerson(next)) return true;
 
   // The reader's own front/back call.
-  const sides = [prev.side, next.side].sort().join('+');
-  return sides === 'back+front';
+  return [prev.side, next.side].sort().join('+') === 'back+front';
 }
 
 // Company web domains on a card (email domains and website), minus free mail.
@@ -186,32 +273,46 @@ function domains(c) {
     .filter((h) => h.includes('.') && !FREE_MAIL.test(h));
 }
 
-// One card from its two sides. The side with the Latin-script name (or the
-// front) leads; the other fills gaps and adds numbers, emails and names.
+// One card from its two sides.
+// - Who: from the side with the readable name (or the front).
+// - Job: from the side with the person's own mobile/email, which is usually
+//   their main job. If the other side is a different organisation (REHDA on
+//   one side, Mah Sing on the other) that job is kept as a second role.
 export function mergeCards(x, y) {
-  const yLeads = (latin(y.name) && !latin(x.name)) || (y.side === 'front' && x.side === 'back');
-  const [a, b] = yLeads ? [y, x] : [x, y];
-  const pick = (k) => a[k] || b[k];
+  const yNamed = (nameTokens(y.name).length && !nameTokens(x.name).length) || (y.side === 'front' && x.side === 'back');
+  const [who, other] = yNamed ? [y, x] : [x, y];
+  const [job, side] = hasPersonalContact(other) && !hasPersonalContact(who) ? [other, who] : [who, other];
+  const sameOrg = !side.organisation || !job.organisation || orgsMatch(job.organisation, side.organisation);
   const seenPhone = new Set();
   const seenEmail = new Set();
-  const names = new Set([a.other_names, b.other_names].filter(Boolean));
-  if (b.name && latin(b.name) !== latin(a.name)) names.add(b.name);
+  const sameWords = (p, q) => nameTokens(p).sort().join(' ') === nameTokens(q).sort().join(' ');
+  const names = new Set([who.other_names, other.other_names].filter(Boolean));
+  if (other.name && !sameWords(other.name, who.name)) names.add(other.name);
+  const roles = [...(job.roles || []), ...(side.roles || [])];
+  if (!sameOrg) roles.push({ title: side.title, organisation: side.organisation });
   return {
-    honorific: pick('honorific'),
-    name: a.name || b.name,
-    title: pick('title'),
-    organisation: pick('organisation'),
-    department: pick('department'),
-    phones: [...a.phones, ...b.phones].filter((p) => !seenPhone.has(last9(p.number)) && seenPhone.add(last9(p.number))),
-    emails: [...a.emails, ...b.emails].filter((e) => !seenEmail.has(e.toLowerCase()) && seenEmail.add(e.toLowerCase())),
-    address: pick('address'),
-    website: pick('website'),
-    category: a.category !== 'Other' ? a.category : b.category,
-    note: [a.note, b.note].filter(Boolean).join(' '),
+    honorific: who.honorific || other.honorific,
+    name: who.name || other.name,
+    title: job.title || (sameOrg ? side.title : ''),
+    organisation: job.organisation || side.organisation,
+    department: job.department || (sameOrg ? side.department : ''),
+    phones: [...job.phones, ...side.phones].filter((p) => !seenPhone.has(last9(p.number)) && seenPhone.add(last9(p.number))),
+    emails: [...job.emails, ...side.emails]
+      .filter((e) => !seenEmail.has(e.toLowerCase()) && seenEmail.add(e.toLowerCase()))
+      .sort((p, q) => isRoleEmail(p) - isRoleEmail(q)), // own mailbox first, info@ last
+    address: job.address || side.address,
+    website: job.website || side.website,
+    category: job.category !== 'Other' ? job.category : side.category,
+    note: [x.note, y.note].filter(Boolean).join(' '),
     side: 'both',
     other_names: [...names].join(' / '),
+    roles,
   };
 }
+
+// "Chairman 2026-2028, REAL ESTATE & HOUSING DEVELOPERS' ASSOCIATION MALAYSIA"
+export const roleLines = (card) =>
+  (card.roles || []).map((r) => [r.title, r.organisation].filter(Boolean).join(', ')).filter(Boolean);
 
 // One line per card, for chat replies.
 export function describe(card) {
@@ -236,6 +337,7 @@ export function toVcard(cards, extraNote = '') {
       const given = c.name;
       const family = '';
       const note = [
+        ...roleLines(c).map((r) => `Also: ${r}`),
         c.other_names && `Also written: ${c.other_names}`,
         c.category && `Category: ${c.category}`,
         extraNote,
