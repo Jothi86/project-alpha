@@ -1,0 +1,17 @@
+{
+  "name": "Name Card Scanner",
+  "short_name": "Name Cards",
+  "description": "Photograph a name card and it lands in your phone's contacts. No typing.",
+  "id": "/play/name-card-scanner/",
+  "start_url": "/play/name-card-scanner/?app=1",
+  "scope": "/play/name-card-scanner/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101014",
+  "theme_color": "#101014",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

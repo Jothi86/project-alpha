@@ -6,6 +6,12 @@
 <title>Name Card Scanner</title>
 <meta name="description" content="Photograph a name card and it lands in your phone's contacts. No typing.">
 <meta name="theme-color" content="#101014">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Name Cards">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap">
 <style>
@@ -66,13 +72,35 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   footer { color: var(--muted); font-size: 13px; margin-top: 24px; }
   [hidden] { display: none !important; }
+  button.install { padding: 8px 12px; font-size: 14px; border-radius: 999px; }
+  button.install svg { width: 16px; height: 16px; }
+  .ios-help { display: flex; gap: 12px; align-items: flex-start; }
+  .ios-help ol { margin: 0; }
+  .ios-help .share { display: inline-block; vertical-align: -3px; width: 18px; height: 18px; }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <a class="back" href="/">← project alpha</a>
+    <a class="back" href="/" id="back">← project alpha</a>
+    <button class="install primary" id="install" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4"/><path d="M5 20h14"/></svg>
+      Add to home screen
+    </button>
   </header>
+  <section id="ios-help" hidden>
+    <div class="ios-help">
+      <img src="icons/apple-touch-icon.png" alt="" width="48" height="48" style="border-radius:12px">
+      <div>
+        <strong>Add it to your home screen</strong>
+        <ol class="muted">
+          <li>Tap <svg class="share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m0 0-4 4m4-4 4 4"/><path d="M6 10H5v11h14V10h-1"/></svg> <strong>Share</strong> at the bottom of Safari.</li>
+          <li>Scroll down and tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+        </ol>
+        <button class="link" id="ios-help-close">Got it</button>
+      </div>
+    </div>
+  </section>
   <h1>Name Card Scanner</h1>
   <p class="lede">Take a photo of a name card. It reads the card and puts the contact on your phone. No typing.</p>
 
@@ -390,6 +418,43 @@ function renderCard(card, note) {
   draw('', '');
   return { el, deliver: () => deliver(false) };
 }
+
+// --- add to home screen ---
+
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let installPrompt = null;
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+if (standalone) {
+  $('back').hidden = true; // inside the app there is no site to go back to
+} else if (isIOS) {
+  $('install').hidden = false; // Safari has no install prompt; show the two taps instead
+}
+
+// Android / desktop Chrome, Edge, Samsung Internet: keep the browser's own
+// install prompt and fire it from our button.
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  $('install').hidden = false;
+});
+addEventListener('appinstalled', () => { installPrompt = null; $('install').hidden = true; });
+
+$('install').onclick = async () => {
+  if (installPrompt) {
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') $('install').hidden = true;
+    installPrompt = null;
+  } else if (isIOS) {
+    $('ios-help').hidden = false;
+    $('ios-help').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+};
+$('ios-help-close').onclick = () => { $('ios-help').hidden = true; };
 
 // --- own Telegram bot ---
 
