@@ -151,16 +151,25 @@ function merge(existing, fresh) {
     emailAddresses: union(existing.emailAddresses, fresh.emailAddresses, (e) => e.value.toLowerCase()),
     addresses: union(existing.addresses, fresh.addresses, (a) => (a.formattedValue || '').toLowerCase()),
     urls: union(existing.urls, fresh.urls, (u) => u.value.toLowerCase()),
-    biographies: newNote && !oldNote.includes(newNote)
-      ? [{ value: [oldNote, newNote].filter(Boolean).join('\n'), contentType: 'TEXT_PLAIN' }]
+    // Line by line, so a second save adds new lines without repeating old ones.
+    biographies: newNote
+      ? [{ value: [...new Set([...oldNote.split('\n'), ...newNote.split('\n')].filter(Boolean))].join('\n'), contentType: 'TEXT_PLAIN' }]
       : existing.biographies || [],
   };
 }
 
-// Save one card. Returns { resourceName, updated, name }.
-export async function saveCard(token, card, note = '') {
-  const fresh = toPerson(card, [`Category: ${card.category}`, note].filter(Boolean).join('\n'));
-  const existing = await findExisting(token, card);
+// Save one card. Returns { resourceName, updated, name }. Pass
+// { resourceName } to update a contact already made from this card (its
+// other side was scanned first).
+export async function saveCard(token, card, note = '', { resourceName } = {}) {
+  const fresh = toPerson(card, [
+    card.other_names && `Also written: ${card.other_names}`,
+    `Category: ${card.category}`,
+    note,
+  ].filter(Boolean).join('\n'));
+  const existing = resourceName
+    ? await api(token, 'GET', `${resourceName}?personFields=${FIELDS}`)
+    : await findExisting(token, card);
 
   let person;
   if (existing) {
@@ -181,6 +190,45 @@ export async function saveCard(token, card, note = '') {
     updated: Boolean(existing),
     name: person.names?.[0]?.displayName || card.name,
   };
+}
+
+// Every contact, flattened for searching: one object per person. Read-only.
+export async function listAll(token) {
+  const groups = new Map();
+  const list = await api(token, 'GET', 'contactGroups?pageSize=1000&groupFields=name,groupType');
+  for (const g of list.contactGroups || []) {
+    if (g.groupType === 'USER_CONTACT_GROUP') groups.set(g.resourceName, g.name);
+  }
+
+  const people = [];
+  let pageToken = '';
+  do {
+    const data = await api(
+      token,
+      'GET',
+      `people/me/connections?personFields=${FIELDS}&pageSize=1000&sortOrder=LAST_MODIFIED_DESCENDING` +
+        (pageToken ? `&pageToken=${pageToken}` : ''),
+    );
+    for (const p of data.connections || []) {
+      const org = p.organizations?.[0] || {};
+      people.push({
+        name: p.names?.[0]?.displayName || '',
+        title: org.title || '',
+        organisation: org.name || '',
+        department: org.department || '',
+        phones: (p.phoneNumbers || []).map((x) => x.value).join(' / '),
+        emails: (p.emailAddresses || []).map((x) => x.value).join(' / '),
+        address: p.addresses?.[0]?.formattedValue || '',
+        labels: (p.memberships || [])
+          .map((m) => groups.get(m.contactGroupMembership?.contactGroupResourceName))
+          .filter(Boolean)
+          .join(' / '),
+        notes: (p.biographies?.[0]?.value || '').replace(/\s+/g, ' ').trim(),
+      });
+    }
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+  return people;
 }
 
 export function deleteContact(token, resourceName) {

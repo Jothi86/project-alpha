@@ -2,7 +2,9 @@
 // Photo of a name card in -> short summary + contact file (.vcf) back.
 // Photos are never stored; they pass straight through to the card reader.
 
-import { readCard, describe, toVcard } from '../../../public/play/name-card-scanner/cardread.js';
+import {
+  readCard, describe, toVcard, isOtherSide, mergeCards,
+} from '../../../public/play/name-card-scanner/cardread.js';
 import { tg, tgSendFile, decrypt, toBase64, underLimit, DAILY_LIMIT } from '../../../server/shared.js';
 import { disconnect } from './connect.js';
 
@@ -11,7 +13,7 @@ const HELP =
   'send back a contact file. Tap it to save the contact to your phone. ' +
   'Add a caption to note where you met. /disconnect to unlink this bot.';
 
-export async function onRequestPost({ request, env, params, waitUntil }) {
+export async function onRequestPost({ request, env, params }) {
   const raw = await env.CARDS_KV.get(`bot:${params.id}`);
   if (!raw) return new Response('gone', { status: 404 });
   const bot = JSON.parse(raw);
@@ -24,9 +26,10 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
   const message = update.message;
   if (!message) return new Response('ok');
 
-  // Answer Telegram at once; the card is read in the background so a slow
-  // read never makes Telegram retry the update.
-  waitUntil(handle(env, params.id, bot, message).catch((err) => console.error(err.message)));
+  // Handled before answering: the webhook is set to one connection, so
+  // Telegram sends the next photo only after this one is done. That keeps a
+  // front and back sent together (an album) in order, so they can merge.
+  await handle(env, params.id, bot, message).catch((err) => console.error(err.message));
   return new Response('ok');
 }
 
@@ -76,12 +79,33 @@ async function handle(env, id, bot, message) {
 
     const date = new Date().toISOString().slice(0, 10);
     const where = (message.caption || '').trim();
-    const note = [`Scanned ${date}`, where && `Met: ${where}`].filter(Boolean).join('\n');
-    await say(cards.map((c) => describe(c) + (c.note ? `\n  (${c.note})` : '')).join('\n') +
-      '\n\nTap the file below to save.');
+    let note = [`Scanned ${date}`, where && `Met: ${where}`].filter(Boolean).join('\n');
+    const sendFile = (list) => {
+      const name = (list[0].name || list[0].organisation || 'contact').replace(/[\\/:*?"<>|]+/g, '').slice(0, 60);
+      return tgSendFile(token, chatId, `${name}.vcf`, toVcard(list, note), 'text/vcard');
+    };
 
-    const name = (cards[0].name || cards[0].organisation || 'contact').replace(/[\\/:*?"<>|]+/g, '').slice(0, 60);
-    await tgSendFile(token, chatId, `${name}.vcf`, toVcard(cards, note), 'text/vcard');
+    // The other side of the card sent just before: one contact, not two.
+    const lastKey = `last:${id}`;
+    const last = JSON.parse((await env.CARDS_KV.get(lastKey)) || 'null');
+    if (cards.length === 1 && last && isOtherSide(last.card, cards[0], Date.now() - last.at)) {
+      await env.CARDS_KV.delete(lastKey);
+      const card = mergeCards(last.card, cards[0]);
+      note = [...new Set([...last.note.split('\n'), ...note.split('\n')])].filter(Boolean).join('\n');
+      await say(`Added the other side to: ${describe(card)}\n\nUse this new file; it has both sides.`);
+      return sendFile([card]);
+    }
+
+    if (cards.length === 1) {
+      await env.CARDS_KV.put(lastKey, JSON.stringify({ card: cards[0], at: Date.now(), note }), { expirationTtl: 300 });
+    } else {
+      await env.CARDS_KV.delete(lastKey);
+    }
+
+    await say(cards.map((c) => describe(c) + (c.note ? `\n  (${c.note})` : '')).join('\n') +
+      '\n\nTap the file below to save.' +
+      (cards.length === 1 ? ' Two-sided card? Send the back next.' : ''));
+    await sendFile(cards);
   } catch (err) {
     await say(`Something went wrong with that card: ${err.message}`);
   }

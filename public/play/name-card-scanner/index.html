@@ -213,7 +213,7 @@
       <input type="file" accept="image/*" multiple id="upload">
     </label>
   </div>
-  <p class="muted" style="margin:10px 0 12px">One card per photo works best. Two cards side by side, or the front and back of one card, also work.</p>
+  <p class="muted" style="margin:10px 0 12px">One card per photo works best; two cards side by side also work. Two-sided card? Scan the front, then the back. They join into one contact.</p>
   <label class="batch-toggle" id="batch-row" hidden>
     <input type="checkbox" id="batch">
     <span><strong>Batch mode</strong> — scan several cards, then add them all in one go</span>
@@ -225,7 +225,7 @@
   <div id="results"></div>
 
   <div class="tray" id="tray" hidden>
-    <div><strong id="tray-count">0 cards</strong> <span class="muted">ready</span></div>
+    <div><strong id="tray-count">0 cards</strong> <span class="muted" id="tray-note">ready</span></div>
     <div class="row">
       <button class="link" id="tray-clear">Clear</button>
       <button class="primary" id="tray-add">Add all to Contacts</button>
@@ -267,7 +267,7 @@
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script type="module">
-import { describe, toVcard } from './cardread.js';
+import { describe, toVcard, isOtherSide, mergeCards } from './cardread.js';
 import { saveCard } from './contacts.js';
 
 const GOOGLE_CLIENT_ID = '1057352117297-rgivh3hrb8u71lj8guq0o4mqpo632206.apps.googleusercontent.com';
@@ -380,11 +380,39 @@ $('cam').onchange = (e) => { const f = [...e.target.files]; e.target.value = '';
 $('upload').onchange = (e) => { const f = [...e.target.files]; e.target.value = ''; handleFiles(f); };
 
 async function handleFiles(files) {
+  cancelAutoSend();
   for (const file of files) await handlePhoto(file);
-  // Without batch mode, everything from this round goes out at once: one
-  // download elsewhere; on iPhone Safari needs a tap, so the tray waits for it.
-  if (mode !== 'google' && !$('batch').checked && tray.length && !isIOS) sendTray();
+  // Without batch mode the tray goes out by itself, after a short pause in
+  // case the back of the card is coming next. On iPhone Safari needs a tap,
+  // so the tray waits for it.
+  if (mode !== 'google' && !$('batch').checked && tray.length && !isIOS) scheduleAutoSend();
 }
+
+const AUTO_SEND_SECONDS = 8;
+let autoSend = null;
+
+function scheduleAutoSend() {
+  cancelAutoSend();
+  let left = AUTO_SEND_SECONDS;
+  const tick = () => {
+    if (left <= 0) { cancelAutoSend(); sendTray(); return; }
+    $('tray-note').textContent = `saving in ${left}s. Scanning the back? Take it now.`;
+    $('tray-add').textContent = 'Save now';
+    left -= 1;
+  };
+  tick();
+  autoSend = setInterval(tick, 1000);
+}
+
+function cancelAutoSend() {
+  if (autoSend) clearInterval(autoSend);
+  autoSend = null;
+  $('tray-note').textContent = 'ready';
+  $('tray-add').textContent = isIOS ? 'Add all to iPhone Contacts' : 'Add all to Contacts';
+}
+
+// The single card shown last, so the other side of it can join it.
+let recent = null;
 
 // --- contact files and the tray ---
 
@@ -428,6 +456,7 @@ function showTray() {
 }
 
 function sendTray() {
+  cancelAutoSend();
   if (!tray.length) return;
   sendContacts(tray.map((t) => t.card), tray[0].note);
   tray.forEach((t) => t.view.sent());
@@ -436,6 +465,7 @@ function sendTray() {
 }
 
 function clearTray() {
+  cancelAutoSend();
   tray.forEach((t) => t.view.dropped());
   tray = [];
   showTray();
@@ -496,11 +526,22 @@ async function handlePhoto(file) {
   }
 
   box.remove();
+
+  // The other side of the card just scanned: fold it into that contact.
+  if (cards.length === 1 && recent && isOtherSide(recent.card, cards[0], Date.now() - recent.at)) {
+    const { view } = recent;
+    Object.assign(recent.card, mergeCards(recent.card, cards[0]));
+    recent = null; // two sides per card; a third photo starts a new contact
+    await view.mergedBack();
+    return;
+  }
+
   const date = new Date().toISOString().slice(0, 10);
   for (const card of cards) {
     const view = renderCard(card, `Scanned ${date}`);
     $('results').prepend(view.el);
     await view.deliver();
+    recent = cards.length === 1 ? { card, view, at: Date.now() } : null;
   }
 }
 
@@ -511,13 +552,17 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 function renderCard(card, note) {
   const el = document.createElement('div');
   el.className = 'result';
-  let saved = false;
+  let resourceName = '';   // the Google contact made from this card
+  let bothSides = false;
+  let wasSent = false;     // contact file already handed to the phone
+  let queue = Promise.resolve();
 
   function draw(statusHtml, statusClass) {
     const who = [card.honorific, card.name].filter(Boolean).join(' ') || card.organisation || '(no name)';
     const role = [card.title, card.organisation].filter(Boolean).join(', ');
     const lines = [...card.phones.map((p) => `${p.type}: ${p.number}`), ...card.emails, card.address].filter(Boolean);
     el.innerHTML = `
+      ${bothSides ? '<div class="label" style="margin:0 0 4px">Front + back</div>' : ''}
       <div class="name">${esc(who)}</div>
       ${role ? `<div class="role">${esc(role)}</div>` : ''}
       <div class="lines">${lines.map(esc).join('<br>')}</div>
@@ -531,10 +576,29 @@ function renderCard(card, note) {
   const fixLink = '<button class="link" data-act="fix">Fix something</button>';
   const againLabel = isIOS ? 'Add to Contacts again' : 'Download again';
   const view = {
-    sent: () => draw(isIOS
+    sent: () => { wasSent = true; draw(isIOS
       ? `✓ Sent to Apple's Add Contact screen. Tap Add there. <button class="link" data-act="file">${againLabel}</button> ${fixLink}`
-      : `✓ Contact file downloaded. Open it to save. <button class="link" data-act="file">${againLabel}</button> ${fixLink}`, 'ok'),
+      : `✓ Contact file downloaded. Open it to save. <button class="link" data-act="file">${againLabel}</button> ${fixLink}`, 'ok'); },
     dropped: () => draw(`Removed from the list. <button class="link" data-act="file">${isIOS ? 'Add to Contacts' : 'Download'}</button>`, ''),
+
+    // The back of this card came in and has been merged into `card`.
+    mergedBack: () => {
+      bothSides = true;
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (mode === 'google') return deliver(false);
+      if (tray.some((t) => t.card === card)) {
+        draw(`Back added. In the list below. <button class="link" data-act="file">${isIOS ? 'Add just this one' : 'Download just this one'}</button> ${fixLink}`, '');
+        return;
+      }
+      if (!wasSent) return deliver(false);
+      // The front already went out on its own: hand over the full card.
+      if (isIOS) {
+        draw(`Back added. <button class="primary" data-act="file">Add updated contact</button> ${fixLink}`, '');
+      } else {
+        sendContacts([card], note);
+        draw(`✓ Back added. Open this new file; it has both sides. <button class="link" data-act="file">${againLabel}</button> ${fixLink}`, 'ok');
+      }
+    },
   };
 
   // This card on its own, straight away (always from a tap).
@@ -545,15 +609,23 @@ function renderCard(card, note) {
     view.sent();
   }
 
-  async function deliver(fromTap = false) {
+  // One delivery at a time, so a back that arrives while the front is still
+  // saving updates the same contact instead of racing it.
+  function deliver(fromTap = false) {
+    queue = queue.then(() => deliverNow(fromTap));
+    return queue;
+  }
+
+  async function deliverNow(fromTap) {
     if (mode !== 'google') {
       if (fromTap) return sendOne();
+      if (tray.some((t) => t.card === card)) return;
       tray.push({ card, note, view });
       showTray();
       const batch = $('batch').checked;
       draw(batch || isIOS
         ? `In the list below. <button class="link" data-act="file">${isIOS ? 'Add just this one' : 'Download just this one'}</button> ${fixLink}`
-        : '<span class="spinner"></span> Preparing the contact file…', batch || isIOS ? '' : 'busy');
+        : `Saving in a moment. <button class="link" data-act="file">Download now</button> ${fixLink}`, '');
       return;
     }
     if (!haveToken()) {
@@ -568,9 +640,12 @@ function renderCard(card, note) {
     }
     draw('<span class="spinner"></span> Saving…', 'busy');
     try {
-      const r = await saveCard(token.value, card, note);
-      saved = true;
-      draw(`✓ ${r.updated ? 'Updated the contact you already had' : 'Saved'} in ${esc(email || 'Google Contacts')}. It will appear on your phone shortly. ${fixLink}`, 'ok');
+      const r = await saveCard(token.value, card, note, { resourceName: resourceName || undefined });
+      const first = !resourceName;
+      resourceName = r.resourceName;
+      const what = !first ? 'Back added to the same contact'
+        : r.updated ? 'Updated the contact you already had' : 'Saved';
+      draw(`✓ ${what} in ${esc(email || 'Google Contacts')}. It will appear on your phone shortly. ${fixLink}`, 'ok');
     } catch (err) {
       draw(`${esc(err.message)} <button class="primary" data-act="google">Try again</button> <button class="link" data-act="file">Contact file instead</button>`, 'err');
     }
@@ -604,7 +679,7 @@ function renderCard(card, note) {
   }
 
   draw('', '');
-  return { el, deliver: () => deliver(false) };
+  return { el, deliver: () => deliver(false), mergedBack: view.mergedBack };
 }
 
 // --- add to home screen ---

@@ -63,6 +63,7 @@ export async function onRequestPost({ request, env }) {
       secret_token: secret,
       allowed_updates: ['message'],
       drop_pending_updates: true,
+      max_connections: 1, // one update at a time: front and back stay in order
     });
   } catch (err) {
     await kv.delete(`bot:${id}`);

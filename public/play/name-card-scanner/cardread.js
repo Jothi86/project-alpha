@@ -14,6 +14,9 @@ Rules:
   leave it as an empty string or empty list instead.
 - Cards may be in English, Malay, Chinese or Tamil. Keep names and titles in
   the language printed (prefer the Latin-script version when both are shown).
+- NEVER transliterate or translate a name (no pinyin, no romanisation). If the
+  name is printed only in Chinese/Tamil/Jawi, "name" is exactly those
+  characters. Same for the organisation.
 - Keep honorifics and titles (Dato', Datuk Seri, Ir., Dr., YB) in "honorific".
 - Phone numbers: Malaysian numbers in +60 format with no spaces
   (e.g. 012-345 6789 -> +60123456789, 04-262 1234 -> +6042621234).
@@ -22,6 +25,13 @@ Rules:
 - category: Government (ministries, state government, JKR, MBPP, MBSP, TNB and
   other agencies or GLCs), Politician, Company, Media, NGO, or Other.
 - "note" is one short line about anything unclear (blurred digits etc.), or empty.
+- "side": "front" if this is the side with the person's name as the main
+  item; "back" if it is the reverse of a card (company details, services, a
+  map, a logo, or the same details in another language / script);
+  "single" if the photo shows everything (a one-sided card, or both sides
+  merged as above).
+- "other_names": the person's name as printed in another script (Chinese,
+  Tamil, Jawi), or empty. Keep "name" in Latin script whenever it is printed.
 If there is no card in the photo, return an empty "cards" list.`;
 
 const STR = { type: 'STRING' };
@@ -55,6 +65,8 @@ const SCHEMA = {
             enum: ['Government', 'Politician', 'Company', 'Media', 'NGO', 'Other'],
           },
           note: STR,
+          side: { type: 'STRING', enum: ['front', 'back', 'single'] },
+          other_names: STR,
         },
         required: ['name', 'organisation', 'phones', 'emails', 'category'],
       },
@@ -118,6 +130,86 @@ function clean(c) {
     website: s(c.website),
     category: s(c.category) || 'Other',
     note: s(c.note),
+    side: s(c.side) || 'single',
+    other_names: s(c.other_names),
+  };
+}
+
+// --- front and back scanned as two photos ---
+
+const latin = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const last9 = (n) => String(n).replace(/\D/g, '').slice(-9);
+export const OTHER_SIDE_WINDOW_MS = 3 * 60 * 1000;
+
+// Is `next` the other side of the card `prev`, scanned `ageMs` earlier?
+export function isOtherSide(prev, next, ageMs) {
+  if (!prev || !next || ageMs > OTHER_SIDE_WINDOW_MS) return false;
+
+  // Two names in Latin script decide it on their own.
+  const a = latin(prev.name);
+  const b = latin(next.name);
+  if (a && b) return a === b;
+
+  // A personal number or email on both sides. Office and fax lines are
+  // shared by colleagues, so on their own they do not count.
+  const mobiles = (c) => c.phones.filter((p) => p.type === 'mobile').map((p) => last9(p.number));
+  const emails = (c) => c.emails.map((e) => e.toLowerCase());
+  if (mobiles(prev).some((m) => mobiles(next).includes(m))) return true;
+  if (emails(prev).some((e) => emails(next).includes(e))) return true;
+
+  // From here one side has no Latin-script name: typically the back, with the
+  // name in Chinese/Tamil or no person at all. Link it by the company.
+  const otherNumbers = (c) => c.phones.filter((p) => p.type !== 'mobile').map((p) => last9(p.number));
+  const sameOrg = latin(prev.organisation) && latin(prev.organisation) === latin(next.organisation);
+  const sharedDomain = domains(prev).some((d) => domains(next).includes(d));
+  const sharedLine = otherNumbers(prev).some((n) => otherNumbers(next).includes(n));
+  if (sameOrg || sharedDomain || sharedLine) return true;
+
+  // A side with no person on it at all (no Latin name, mobile or email) is a back.
+  const noPerson = (c) => !latin(c.name) && !mobiles(c).length && !c.emails.length;
+  if (noPerson(prev) || noPerson(next)) return true;
+
+  // The reader's own front/back call.
+  const sides = [prev.side, next.side].sort().join('+');
+  return sides === 'back+front';
+}
+
+// Company web domains on a card (email domains and website), minus free mail.
+const FREE_MAIL = /^(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|msn|icloud|me|aol|proton|protonmail)\./;
+function domains(c) {
+  const hosts = [
+    ...c.emails.map((e) => e.split('@')[1] || ''),
+    (c.website || '').replace(/^[a-z]+:\/\//i, '').split('/')[0],
+  ];
+  return hosts
+    .map((h) => h.toLowerCase().replace(/^www\./, '').trim())
+    .filter((h) => h.includes('.') && !FREE_MAIL.test(h));
+}
+
+// One card from its two sides. The side with the Latin-script name (or the
+// front) leads; the other fills gaps and adds numbers, emails and names.
+export function mergeCards(x, y) {
+  const yLeads = (latin(y.name) && !latin(x.name)) || (y.side === 'front' && x.side === 'back');
+  const [a, b] = yLeads ? [y, x] : [x, y];
+  const pick = (k) => a[k] || b[k];
+  const seenPhone = new Set();
+  const seenEmail = new Set();
+  const names = new Set([a.other_names, b.other_names].filter(Boolean));
+  if (b.name && latin(b.name) !== latin(a.name)) names.add(b.name);
+  return {
+    honorific: pick('honorific'),
+    name: a.name || b.name,
+    title: pick('title'),
+    organisation: pick('organisation'),
+    department: pick('department'),
+    phones: [...a.phones, ...b.phones].filter((p) => !seenPhone.has(last9(p.number)) && seenPhone.add(last9(p.number))),
+    emails: [...a.emails, ...b.emails].filter((e) => !seenEmail.has(e.toLowerCase()) && seenEmail.add(e.toLowerCase())),
+    address: pick('address'),
+    website: pick('website'),
+    category: a.category !== 'Other' ? a.category : b.category,
+    note: [a.note, b.note].filter(Boolean).join(' '),
+    side: 'both',
+    other_names: [...names].join(' / '),
   };
 }
 
@@ -143,7 +235,11 @@ export function toVcard(cards, extraNote = '') {
       // split into first/last, so the whole name goes in as written.
       const given = c.name;
       const family = '';
-      const note = [c.category && `Category: ${c.category}`, extraNote].filter(Boolean).join('\n');
+      const note = [
+        c.other_names && `Also written: ${c.other_names}`,
+        c.category && `Category: ${c.category}`,
+        extraNote,
+      ].filter(Boolean).join('\n');
       const lines = [
         'BEGIN:VCARD',
         'VERSION:3.0',
