@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Name Card Scanner Privacy</title>
+<style>
+  :root { --bg: #101014; --fg: #f5f5f7; --muted: #9a9ba6; --teal: #17c9a8; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.6; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px 64px; }
+  a { color: var(--teal); }
+  h1 { font-size: 26px; } h2 { font-size: 18px; margin-top: 28px; }
+  p, li { color: #d8d8de; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="./">← Name Card Scanner</a></p>
+  <h1>Privacy</h1>
+  <p>Last updated 3 October 2026.</p>
+
+  <h2>Photos</h2>
+  <p>When you take or upload a photo, it is shrunk in your browser and sent to our card reader, which passes it to Google's Gemini API to read the text. The photo is not saved by this site. The details read from the card are sent back to your browser and not kept.</p>
+
+  <h2>Google Contacts</h2>
+  <p>If you choose <em>Sign in with Google</em>, you grant access to your Google Contacts (<code>https://www.googleapis.com/auth/contacts</code>) and your email address. The access is used only to:</p>
+  <ul>
+    <li>check whether a scanned person is already in your contacts, so they are not added twice;</li>
+    <li>create or update that contact and add it to a "Name Cards" label.</li>
+  </ul>
+  <p>All of this happens directly between your browser and Google. The access token stays in your browser's memory and is never sent to this site's servers. Your contacts are never stored, shared, sold or used for anything else. Use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. You can remove access at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</p>
+
+  <h2>Telegram bots</h2>
+  <p>If you connect your own Telegram bot, its token is stored encrypted so the bot can reply to you. Only the chat that finishes the setup can use it. Photos sent to the bot pass through the card reader as above and are not saved. Disconnecting deletes the stored token.</p>
+
+  <h2>Usage limits</h2>
+  <p>To keep the service free, each visitor and each connected bot can read a limited number of cards a day. A short-lived counter keyed to your IP address or bot is kept for up to two days for this purpose only.</p>
+
+</main>
+</body>
+</html>

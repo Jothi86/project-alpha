@@ -1,0 +1,10 @@
+# Cloudflare Pages config. Bindings for the functions in functions/ live here;
+# secrets (GEMINI_API_KEY, TOKEN_KEY) are set with `wrangler pages secret put`.
+name = "project-alpha"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-09-01"
+
+# Name Card Scanner: daily counters and connected Telegram bots.
+[[kv_namespaces]]
+binding = "CARDS_KV"
+id = "00ecf269a28e4b0eace773918dc6d3b9"
