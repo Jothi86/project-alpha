@@ -117,7 +117,28 @@
             color: var(--muted); font-size: 13px; }
   .help strong { color: var(--fg); }
 
+  /* "Look at the grey ones": one tab, stepped through by the visitor's own answers. */
+  .look { display: block; margin: -8px auto 22px; padding: 9px 20px; border-radius: 999px; border: 1px dashed var(--muted);
+          background: none; color: var(--fg); font-weight: 700; font-size: 13px; }
+  .look:hover { border-color: var(--teal); color: var(--teal); }
+  .look[hidden] { display: none; }
+  .review { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 4;
+            width: min(560px, calc(100% - 24px)); padding: 14px 16px; border-radius: 16px;
+            background: var(--raised); border: 1px solid var(--teal); box-shadow: 0 12px 40px rgba(0, 0, 0, .5);
+            display: grid; grid-template-columns: 1fr auto; gap: 10px 14px; align-items: center; }
+  .review[hidden] { display: none; }
+  .review .q { font-size: 14px; }
+  .review .q small { display: block; color: var(--muted); font-size: 12px; }
+  .review .acts { display: flex; gap: 8px; }
+  .review .acts button { padding: 9px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); font-weight: 800; font-size: 13px; }
+  .review .acts .free { border-color: var(--teal); color: var(--teal); }
+  .review .acts .taken { border-color: #5a1f1c; color: #f0766f; }
+  .review .open-again { grid-column: 1 / -1; font-size: 12px; color: var(--muted); text-decoration: underline; }
+  .tile .why.you { color: var(--teal); }
+
   .idle .stage, .idle .meter { display: none; }
+
+  @media (max-width: 480px) { .review { grid-template-columns: 1fr; } .review .acts button { flex: 1; } }
 
   /* Loader: blurred pulse, like a lens finding focus. */
   .loader { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg);
@@ -164,6 +185,7 @@
     <p><strong>What it checks.</strong> The .com, .my and .com.my domains, plus Instagram, TikTok, YouTube, Threads, Telegram, Facebook, X and LinkedIn — for the brand and each branch you switch on. Type a branch of your own in "+ your own" and press Enter; up to 8 at once.</p>
     <p><strong>Free / Taken / Check.</strong> Free means no one has it. Taken means it's registered. Check means the site hides it behind a login or blocked the lookup — tap the tile to look yourself.</p>
     <p><strong>The meter and the glow.</strong> Each Free counts fully and each Check counts a third. The more of a name is still open, the brighter the sign and the higher the needle.</p>
+    <p><strong>Look yourself.</strong> "Look at the grey ones" opens each Check site in one other tab, where you're already logged in. Tap Free or Taken for what you see and it moves on to the next; your answers count in the meter.</p>
     <p><strong>Underscores.</strong> When berjayafood is taken, it also tries berjaya_food and shows it under the tile if that one is free.</p>
   </section>
 
@@ -174,6 +196,7 @@
       <button class="step" id="next" type="button" aria-label="Next name">›</button>
     </div>
     <div class="dots" id="dots"></div>
+    <button class="look" id="look" type="button" hidden></button>
     <p class="group-label">Websites</p>
     <div class="tiles" id="domains"></div>
     <p class="group-label">Social media</p>
@@ -187,6 +210,16 @@
     <div class="pct" id="pct"></div>
   </aside>
 </main>
+
+<div class="review" id="review" hidden role="dialog" aria-label="What did you see?">
+  <div class="q" id="review-q"></div>
+  <div class="acts">
+    <button type="button" class="free" data-a="available">Free</button>
+    <button type="button" class="taken" data-a="taken">Taken</button>
+    <button type="button" data-a="skip">Skip</button>
+  </div>
+  <a class="open-again" id="review-open" href="#" target="bc-look" rel="opener">Tab didn't open? Tap here</a>
+</div>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -207,7 +240,7 @@ const WEIGHT = { available: 1, unknown: 1 / 3, taken: 0, invalid: 0 };
 
 const MAX_ON = 8;
 // extra: branches visitors typed themselves, shown as chips after the preset ones.
-const state = { on: new Set(DEFAULT_ON), extra: [], names: [], idx: 0, results: new Map(), running: false };
+const state = { on: new Set(DEFAULT_ON), extra: [], names: [], idx: 0, results: new Map(), running: false, review: null };
 const allBranches = () => [...BRANCHES, ...state.extra];
 
 // Adds a typed branch as a chip, switched on. Returns false if it couldn't go on.
@@ -233,7 +266,8 @@ function score(cells) {
 function tile(col, cell, handle) {
   const status = cell?.status || 'pending';
   const url = cell?.url || '#';
-  const why = cell?.note ? `<div class="why">${esc(cell.note)}</div>` : '';
+  const why = cell?.byYou ? '<div class="why you">you checked</div>'
+    : cell?.note ? `<div class="why">${esc(cell.note)}</div>` : '';
   const alt = cell?.alt ? `<span class="alt">${esc(cell.alt.handle)} is free</span>` : '';
   const site = col.kind === 'domain' ? `${handle}${col.label}` : col.label;
   return `<a class="tile ${status}" href="${esc(url)}" target="_blank" rel="noopener">` +
@@ -266,6 +300,55 @@ function update() {
   const s = score(cells);
   document.documentElement.style.setProperty('--score', s.toFixed(3));
   $('pct').textContent = cells ? `${Math.round(s * 100)}%` : '';
+
+  const grey = greyCells(name).length;
+  $('look').hidden = !grey || !!state.review;
+  $('look').textContent = `Look at the ${grey} grey one${grey === 1 ? '' : 's'} yourself`;
+  const r = state.review;
+  $('review').hidden = !r;
+  if (r) {
+    const col = COLUMNS.find((c) => c.id === r.queue[r.at]);
+    const site = col.kind === 'domain' ? `${handle}${col.label}` : `${col.label} @${handle}`;
+    $('review-q').innerHTML = `<strong>${esc(site)}</strong> — free or taken?` +
+      `<small>${r.at + 1} of ${r.queue.length} · opened in the other tab</small>`;
+    $('review-open').href = cells[col.id].url;
+  }
+}
+
+// The "Check" tiles of a name: sites that wouldn't answer us, so the visitor looks.
+function greyCells(name) {
+  const cells = state.results.get(name)?.rows?.[0]?.cells;
+  return cells ? COLUMNS.filter((c) => cells[c.id]?.status === 'unknown').map((c) => c.id) : [];
+}
+
+// Opens the current site in one reused tab named "bc-look", so each answer just
+// moves that tab on. Must run inside a click, or the browser blocks it.
+function openLook() {
+  const r = state.review;
+  const cells = state.results.get(r.name).rows[0].cells;
+  window.open(cells[r.queue[r.at]].url, 'bc-look');
+}
+
+function startReview() {
+  const name = state.names[state.idx];
+  const queue = greyCells(name);
+  if (!queue.length) return;
+  state.review = { name, queue, at: 0 };
+  openLook();
+  update();
+}
+
+function answer(a) {
+  const r = state.review;
+  const cell = state.results.get(r.name).rows[0].cells[r.queue[r.at]];
+  if (a !== 'skip') Object.assign(cell, { status: a, byYou: true });
+  r.at++;
+  if (r.at < r.queue.length) openLook();
+  else {
+    state.review = null;
+    status('Done — your answers are on the tiles and in the meter.');
+  }
+  update();
 }
 
 function status(text, isError) {
@@ -291,6 +374,7 @@ async function run(brandText) {
   state.names = [brand, ...branches.map((b) => `${brand} ${b}`)];
   state.idx = 0;
   state.running = true;
+  state.review = null;
   history.replaceState(null, '', `?name=${encodeURIComponent(brand)}&b=${encodeURIComponent(branches.join(','))}`);
   status('Checking — tiles light up as answers come in.');
   update();
@@ -310,6 +394,7 @@ async function run(brandText) {
 }
 
 function go(delta) {
+  state.review = null;
   state.idx = Math.max(0, Math.min(state.names.length - 1, state.idx + delta));
   update();
 }
@@ -336,9 +421,11 @@ $('chips').addEventListener('click', (e) => {
   else status(`Up to ${MAX_ON} branches at once — switch one off first.`, true);
   update();
 });
+$('look').addEventListener('click', startReview);
+$('review').addEventListener('click', (e) => { const a = e.target.dataset.a; if (a) answer(a); });
 $('prev').addEventListener('click', () => go(-1));
 $('next').addEventListener('click', () => go(1));
-$('dots').addEventListener('click', (e) => { const i = e.target.dataset.i; if (i !== undefined) { state.idx = +i; update(); } });
+$('dots').addEventListener('click', (e) => { const i = e.target.dataset.i; if (i !== undefined) { state.review = null; state.idx = +i; update(); } });
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   if (e.key === 'ArrowLeft') go(-1);
