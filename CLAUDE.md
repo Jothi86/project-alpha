@@ -50,4 +50,7 @@ Ships with, from the first publish:
   (192, 512, maskable 512, 180 apple-touch), a network-first `sw.js` that never caches
   `/api/`, the `beforeinstallprompt` button and the iPhone two-tap steps.
 
-Copy from `name-card-scanner/` or `brand-checker/`.
+Quickest: add `<script src="/kit/share-install.js" defer data-title=… data-text=…
+data-url=… data-mount=… data-accent=… data-sw="sw.js">` (options in the file's header),
+plus the manifest, icons, `sw.js` and og image — see `ember-drift/`. Copies of the kit
+live in stockscreen and Tapis; keep them in step.

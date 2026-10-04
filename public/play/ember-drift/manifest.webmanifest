@@ -1,0 +1,17 @@
+{
+  "name": "Ember Drift",
+  "short_name": "Ember Drift",
+  "description": "A single-seat hauler adrift in the belt. Shoot, dodge, keep the tank off empty.",
+  "id": "/play/ember-drift/",
+  "start_url": "/play/ember-drift/?app=1",
+  "scope": "/play/ember-drift/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0B0718",
+  "theme_color": "#0B0718",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
