@@ -14,9 +14,11 @@ matters: the .com, .my and .com.my domains, plus Instagram, TikTok, YouTube,
 Threads, Telegram, Facebook, X and LinkedIn.
 
 It does the same for each branch the brand might grow into, like "berjaya food" and
-"berjaya hotels". You can type your own branches, or leave them empty for a
-standard set.
+"berjaya hotels". Tap the branches you want, then step through each name with the
+arrows.
 
-Every result is a link. Green means free, red means taken, and grey means the site
-hides it behind a login, so click to look. When a joined-up handle is taken, it also
-tries the underscore version (berjaya_food) and tells you if that one is free.
+The name glows brighter, and the meter climbs, the more of it is still free. Every
+tile is a link. Green means free, red means taken, and grey means the site hides it
+behind a login, so tap to look. When a joined-up handle is taken, it also tries the
+underscore version (berjaya_food) and tells you if that one is free. Share the page
+link and it runs the same check for whoever opens it.

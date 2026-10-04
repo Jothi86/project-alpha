@@ -10,192 +10,319 @@
 <meta property="og:title" content="Brand Checker">
 <meta property="og:description" content="One name in, every domain and social handle out — for the brand and its branches. Free.">
 <meta property="og:url" content="https://project-alpha-dlz.pages.dev/play/brand-checker/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap">
 <style>
+  /* Project Alpha tokens; teal is the tools colour. */
   :root {
-    --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e3df;
-    --accent: #2f5bd3; --free: #1f7a46; --free-bg: #e3f4ea; --taken: #b4352b; --taken-bg: #fbe7e5;
-    --unknown: #6b6b66; --unknown-bg: #efeeea; --invalid: #8a6d1c; --invalid-bg: #fbf2d9;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #151514; --panel: #1f1f1d; --text: #ecebe6; --muted: #9c9b95; --line: #33332f;
-      --accent: #7f9ef0; --free: #7fd3a0; --free-bg: #1d3727; --taken: #f0928a; --taken-bg: #3e2220;
-      --unknown: #b3b2ab; --unknown-bg: #2a2a27; --invalid: #e5c46b; --invalid-bg: #3a321b;
-    }
+    --bg: #101014; --raised: #18181d; --card: #1c1c22; --border: #2a2a32;
+    --fg: #f5f5f7; --muted: #9a9ba6; --teal: #17c9a8; --red: #df281f; --amber: #e5b54a;
+    --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --score: 0; /* 0..1, set by update() — drives the sign and the meter */
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 1180px; margin: 0 auto; padding: 32px 16px 48px; }
-  h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .sub { color: var(--muted); margin: 0 0 24px; }
-  form { display: grid; grid-template-columns: 1fr 2fr auto; gap: 10px; align-items: start;
-         background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
-  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted);
-          text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
-  input { width: 100%; padding: 10px 12px; font: inherit; color: var(--text); background: var(--bg);
-          border: 1px solid var(--line); border-radius: 8px; }
-  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  button { padding: 10px 18px; font: inherit; font-weight: 600; color: #fff; background: var(--accent);
-           border: 0; border-radius: 8px; cursor: pointer; }
-  form button { margin-top: 23px; }
-  button:disabled { opacity: .6; cursor: progress; }
-  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
-  #status { margin: 18px 0 10px; color: var(--muted); min-height: 1.4em; }
-  #status.error { color: var(--taken); }
-  .wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
-  table { border-collapse: collapse; width: 100%; min-width: 900px; }
-  th, td { padding: 10px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap; }
-  thead th { font-size: 12px; color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
-  thead th.group { border-bottom: 0; padding-bottom: 0; }
-  tbody tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
-  tbody th { text-align: left; font-weight: 600; }
-  tr > th:first-child { position: sticky; left: 0; z-index: 1; background: var(--panel); border-right: 1px solid var(--line); }
-  tbody th small { display: block; font-weight: 400; color: var(--muted); }
-  .sep { border-left: 1px solid var(--line); }
-  a.chip { display: inline-block; min-width: 64px; padding: 3px 9px; border-radius: 999px; font-size: 12px;
-           font-weight: 600; text-decoration: none; }
-  .available { color: var(--free); background: var(--free-bg); }
-  .taken { color: var(--taken); background: var(--taken-bg); }
-  .unknown { color: var(--unknown); background: var(--unknown-bg); }
-  .invalid { color: var(--invalid); background: var(--invalid-bg); }
-  .alt { display: block; font-size: 11px; margin-top: 3px; color: var(--free); text-decoration: none; }
-  .note { display: block; font-size: 11px; margin-top: 3px; color: var(--muted); }
-  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; font-size: 13px; color: var(--muted); }
-  .legend span.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-weight: 600; font-size: 12px; margin-right: 4px; }
-  .back { display: inline-block; margin-bottom: 16px; color: var(--muted); text-decoration: none; font-size: 13px; }
-  .back:hover { color: var(--accent); }
-  td.wait { color: var(--muted); font-size: 12px; }
-  @media (max-width: 720px) { form { grid-template-columns: 1fr; } form button { width: 100%; margin-top: 4px; } }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font); overflow-x: hidden; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: inherit; text-decoration: none; }
+
+  .top { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; }
+  .back { color: var(--muted); font-size: 13px; }
+  .back:hover { color: var(--teal); }
+  .help-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border);
+              background: var(--raised); font-weight: 800; }
+  .help-btn[aria-expanded="true"] { background: var(--teal); color: #04221c; border-color: var(--teal); }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 0 20px 40px;
+         display: grid; grid-template-columns: 1fr 64px; gap: 28px; }
+
+  /* --- Input: the brand name is the headline --- */
+  form { grid-column: 1 / -1; text-align: center; }
+  .name-in { width: 100%; max-width: 720px; background: none; border: 0; border-bottom: 2px solid var(--border);
+             color: var(--fg); font: 800 clamp(30px, 6vw, 56px)/1.15 var(--font); text-align: center;
+             letter-spacing: -0.02em; padding: 6px 0 10px; }
+  .name-in:focus { outline: none; border-color: var(--teal); }
+  .name-in::placeholder { color: #3b3b45; }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+  .chip { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--border); background: var(--raised);
+          font-size: 13px; font-weight: 700; color: var(--muted); text-transform: lowercase; }
+  .chip[aria-pressed="true"] { color: var(--fg); border-color: var(--teal); background: #12312b; }
+  .go { margin-top: 18px; padding: 12px 34px; border: 0; border-radius: 999px; background: var(--red);
+        color: #fff; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .go:disabled { opacity: .5; cursor: progress; }
+
+  /* --- Stage: the sign + tiles --- */
+  .stage { min-width: 0; }
+  .sign-row { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 8px; }
+  .step { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border); background: var(--raised);
+          font-size: 20px; transition: opacity .3s; }
+  .step:disabled { opacity: 0; pointer-events: none; }
+  .sign { text-align: center; padding: 26px 10px; border-radius: 20px; background: var(--card);
+          border: 1px solid var(--border); overflow: hidden; position: relative;
+          /* Brighter and greener the more of the name is free. */
+          filter: brightness(calc(0.55 + 0.6 * var(--score))) saturate(calc(0.25 + 0.95 * var(--score)));
+          transition: filter .6s ease; }
+  .sign::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+                  background: radial-gradient(60% 90% at 50% 50%, rgba(23, 201, 168, .35), transparent 70%);
+                  opacity: var(--score); transition: opacity .6s ease; }
+  .sign .handle { position: relative; font: 800 clamp(24px, 5vw, 46px)/1.1 var(--font); letter-spacing: -0.02em;
+                  color: var(--teal); text-shadow: 0 0 calc(28px * var(--score)) rgba(23, 201, 168, .8);
+                  word-break: break-all; }
+  .sign .label { position: relative; color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .dots { display: flex; justify-content: center; gap: 7px; margin: 14px 0 22px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; border: 0; padding: 0; background: var(--border); }
+  .dot.on { background: var(--teal); transform: scale(1.3); }
+
+  .group-label { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+                 color: var(--muted); margin: 0 0 10px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 22px; }
+  .tile { display: block; padding: 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--border);
+          transition: border-color .3s, background .3s, transform .15s; min-height: 82px; }
+  .tile:hover { transform: translateY(-2px); }
+  .tile .site { font-size: 13px; font-weight: 700; }
+  .tile .state { font-size: 18px; font-weight: 800; margin-top: 4px; }
+  .tile .why { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .tile.available { border-color: var(--teal); background: #10302a; }
+  .tile.available .state { color: var(--teal); }
+  .tile.taken { border-color: #5a1f1c; }
+  .tile.taken .state { color: #f0766f; }
+  .tile.unknown .state { color: var(--muted); }
+  .tile.invalid .state { color: var(--amber); }
+  .tile.pending .state { color: #3b3b45; animation: pulse 1.2s ease-in-out infinite; }
+  .tile .alt { display: block; font-size: 11px; color: var(--teal); margin-top: 3px; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  /* --- Meter: how open is this name? --- */
+  .meter { position: relative; display: flex; flex-direction: column; align-items: center; }
+  .meter .bar { position: relative; width: 10px; flex: 1; min-height: 260px; border-radius: 999px;
+                background: linear-gradient(to bottom, var(--teal), #3b3b45 55%, var(--red)); }
+  .meter .needle { position: absolute; left: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%;
+                   background: var(--fg); border: 4px solid var(--bg); box-shadow: 0 0 0 1px var(--border);
+                   top: calc((1 - var(--score)) * 100%); transition: top .5s cubic-bezier(.3, 1.4, .5, 1); }
+  .meter .end { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+                color: var(--muted); padding: 8px 0; text-align: center; }
+  .meter .pct { font-weight: 800; margin-top: 6px; }
+
+  .status { text-align: center; color: var(--muted); min-height: 1.4em; margin-top: 6px; font-size: 14px; }
+  .status.error { color: #f0766f; }
+
+  /* --- Help: hidden until "?" --- */
+  .help { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .help[hidden] { display: none; }
+  .help p { margin: 0; padding: 14px; border-radius: 14px; background: var(--raised); border: 1px solid var(--border);
+            color: var(--muted); font-size: 13px; }
+  .help strong { color: var(--fg); }
+
+  .idle .stage, .idle .meter { display: none; }
+
+  /* Loader: blurred pulse, like a lens finding focus. */
+  .loader { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg);
+            transition: opacity .5s; z-index: 5; }
+  .loader div { width: 46px; height: 46px; border-radius: 50%; background: var(--teal); filter: blur(10px);
+                animation: pulse 1s ease-in-out infinite; }
+  .loader.gone { opacity: 0; pointer-events: none; }
+
+  @media (max-width: 720px) {
+    main { grid-template-columns: 1fr; }
+    .meter { flex-direction: row; order: -1; grid-row: 2; gap: 10px; }
+    .meter .bar { min-height: 10px; height: 10px; width: auto; flex: 1;
+                  background: linear-gradient(to left, var(--teal), #3b3b45 55%, var(--red)); }
+    .meter .needle { top: 50%; left: calc(var(--score) * 100%); transition: left .5s cubic-bezier(.3, 1.4, .5, 1); }
+    .meter .end { padding: 0; }
+    .meter .pct { margin: 0; order: 4; }
+    .meter .end { order: -1; }
+    .meter .end.top { order: 3; }
+    .sign-row { grid-template-columns: 40px 1fr 40px; }
+    .step { width: 40px; height: 40px; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <a class="back" href="/">← project alpha</a>
-  <h1>Brand Checker</h1>
-  <p class="sub">One name in, every domain and social handle out — for the brand and its branches.</p>
+<div class="loader" id="loader"><div></div></div>
 
+<div class="top">
+  <a class="back" href="/">← project alpha</a>
+  <button class="help-btn" id="help-btn" aria-expanded="false" aria-controls="help" title="How it works">?</button>
+</div>
+
+<main id="app" class="idle">
   <form id="form">
-    <div>
-      <label for="name">Brand</label>
-      <input id="name" placeholder="berjaya" autocomplete="off" required>
-    </div>
-    <div>
-      <label for="industries">Branches</label>
-      <input id="industries" placeholder="Leave empty for food, beverages, properties, hotels, holdings" autocomplete="off">
-      <div class="hint">Comma separated, e.g. food, beverages, properties</div>
-    </div>
-    <button id="go" type="submit">Check</button>
+    <input class="name-in" id="name" placeholder="Your brand" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Brand name">
+    <div class="chips" id="chips" aria-label="Branches to check"></div>
+    <button class="go" id="go" type="submit">Check</button>
+    <div class="status" id="status"></div>
   </form>
 
-  <div id="status"></div>
-  <div class="wrap" id="results" hidden></div>
-  <div class="legend" id="legend" hidden>
-    <div><span class="chip available">Free</span>no one has it</div>
-    <div><span class="chip taken">Taken</span>already registered</div>
-    <div><span class="chip unknown">Check</span>site hides it behind a login — click to look</div>
-    <div><span class="chip invalid">Not allowed</span>too long or short for that site</div>
-  </div>
+  <section class="help" id="help" hidden>
+    <p><strong>What it checks.</strong> The .com, .my and .com.my domains, plus Instagram, TikTok, YouTube, Threads, Telegram, Facebook, X and LinkedIn — for the brand and each branch you switch on.</p>
+    <p><strong>Free / Taken / Check.</strong> Free means no one has it. Taken means it's registered. Check means the site hides it behind a login or blocked the lookup — tap the tile to look yourself.</p>
+    <p><strong>The meter and the glow.</strong> Each Free counts fully and each Check counts a third. The more of a name is still open, the brighter the sign and the higher the needle.</p>
+    <p><strong>Underscores.</strong> When berjayafood is taken, it also tries berjaya_food and shows it under the tile if that one is free.</p>
+  </section>
+
+  <section class="stage">
+    <div class="sign-row">
+      <button class="step" id="prev" type="button" aria-label="Previous name">‹</button>
+      <div class="sign"><div class="handle" id="handle"></div><div class="label" id="label"></div></div>
+      <button class="step" id="next" type="button" aria-label="Next name">›</button>
+    </div>
+    <div class="dots" id="dots"></div>
+    <p class="group-label">Websites</p>
+    <div class="tiles" id="domains"></div>
+    <p class="group-label">Social media</p>
+    <div class="tiles" id="socials"></div>
+  </section>
+
+  <aside class="meter" aria-label="How open this name is">
+    <div class="end top">Open</div>
+    <div class="bar"><div class="needle"></div></div>
+    <div class="end">Taken</div>
+    <div class="pct" id="pct"></div>
+  </aside>
 </main>
+
 <script>
 const $ = (id) => document.getElementById(id);
-const LABEL = { available: 'Free', taken: 'Taken', unknown: 'Check', invalid: 'Not allowed' };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-async function api(path) {
-  const res = await fetch(path);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-  return data;
-}
-
-function cell(c) {
-  const title = c.note ? ` title="${esc(c.note)}"` : '';
-  let html = `<a class="chip ${c.status}" href="${esc(c.url)}" target="_blank" rel="noopener"${title}>${LABEL[c.status]}</a>`;
-  if (c.note) html += `<span class="note">${esc(c.note)}</span>`;
-  if (c.alt) html += `<a class="alt" href="${esc(c.alt.url)}" target="_blank" rel="noopener">${esc(c.alt.handle)} free</a>`;
-  return html;
-}
-
-// Same names the bot uses: the brand, then "brand branch" for each branch.
-const DEFAULT_INDUSTRIES = ['food', 'beverages', 'properties', 'hotels', 'holdings'];
 const clean = (s) => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
-const COLUMN_COUNT = 11;
 
-// rows: [{ name, report? , error? }] — rows without a report show as still checking.
-function render(rows, columns) {
-  const domains = columns.filter((c) => c.kind === 'domain');
-  const socials = columns.filter((c) => c.kind === 'social');
-  const head = columns.length
-    ? `<tr><th class="group"></th><th class="group sep" colspan="${domains.length}">Websites</th>` +
-      `<th class="group sep" colspan="${socials.length}">Social media</th></tr>` +
-      `<tr><th></th>${domains.map((c, i) => `<th${i === 0 ? ' class="sep"' : ''}>${esc(c.label)}</th>`).join('')}` +
-      `${socials.map((c, i) => `<th${i === 0 ? ' class="sep"' : ''}>${esc(c.label)}</th>`).join('')}</tr>`
-    : '';
-  const body = rows.map(({ name, report, error }) => {
-    const row = report?.rows[0];
-    const label = `<th>${esc(name)}<small>@${esc(name.replace(/ /g, ''))}</small></th>`;
-    if (!row) {
-      const span = columns.length || COLUMN_COUNT;
-      return `<tr>${label}<td class="wait sep" colspan="${span}">${error ? esc(error) : 'Checking…'}</td></tr>`;
-    }
-    return `<tr>${label}` +
-      domains.map((c, i) => `<td${i === 0 ? ' class="sep"' : ''}>${cell(row.cells[c.id])}</td>`).join('') +
-      socials.map((c, i) => `<td${i === 0 ? ' class="sep"' : ''}>${cell(row.cells[c.id])}</td>`).join('') +
-      `</tr>`;
-  }).join('');
-  $('results').innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
-  $('results').hidden = false;
-  $('legend').hidden = false;
+// Fixed steps, like a camera's stops: a set list of branches to switch on and off.
+const BRANCHES = ['food', 'beverages', 'properties', 'hotels', 'holdings', 'group', 'travel', 'retail', 'tech', 'media'];
+const DEFAULT_ON = new Set(['food', 'beverages', 'properties', 'hotels', 'holdings']);
+const COLUMNS = [
+  ['com', '.com', 'domain'], ['my', '.my', 'domain'], ['com.my', '.com.my', 'domain'],
+  ['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['threads', 'Threads'],
+  ['telegram', 'Telegram'], ['facebook', 'Facebook'], ['x', 'X'], ['linkedin', 'LinkedIn'],
+].map(([id, label, kind = 'social']) => ({ id, label, kind }));
+const STATE = { available: 'Free', taken: 'Taken', unknown: 'Check', invalid: 'Not allowed', pending: '···' };
+// How much each answer counts toward "open": Free fully, Check a third.
+const WEIGHT = { available: 1, unknown: 1 / 3, taken: 0, invalid: 0 };
+
+const state = { on: new Set(DEFAULT_ON), names: [], idx: 0, results: new Map(), running: false };
+
+function score(cells) {
+  const known = COLUMNS.map((c) => cells?.[c.id]).filter(Boolean);
+  if (!known.length) return 0;
+  return known.reduce((sum, c) => sum + (WEIGHT[c.status] ?? 0), 0) / COLUMNS.length;
+}
+
+function tile(col, cell, handle) {
+  const status = cell?.status || 'pending';
+  const url = cell?.url || '#';
+  const why = cell?.note ? `<div class="why">${esc(cell.note)}</div>` : '';
+  const alt = cell?.alt ? `<span class="alt">${esc(cell.alt.handle)} is free</span>` : '';
+  const site = col.kind === 'domain' ? `${handle}${col.label}` : col.label;
+  return `<a class="tile ${status}" href="${esc(url)}" target="_blank" rel="noopener">` +
+    `<div class="site">${esc(site)}</div><div class="state">${STATE[status]}</div>${why}${alt}</a>`;
+}
+
+// One redraw for everything, after every change.
+function update() {
+  $('chips').innerHTML = BRANCHES.map((b) =>
+    `<button type="button" class="chip" data-b="${b}" aria-pressed="${state.on.has(b)}">${b}</button>`).join('');
+  $('go').disabled = state.running;
+  if (!state.names.length) return;
+
+  $('app').classList.remove('idle');
+  const name = state.names[state.idx];
+  const handle = name.replace(/ /g, '');
+  const result = state.results.get(name);
+  const cells = result?.rows?.[0]?.cells;
+
+  $('handle').textContent = `@${handle}`;
+  $('label').textContent = result?.error ? result.error : `${name} · ${state.idx + 1} of ${state.names.length}`;
+  $('prev').disabled = state.idx === 0;
+  $('next').disabled = state.idx === state.names.length - 1;
+  $('dots').innerHTML = state.names.map((n, i) =>
+    `<button type="button" class="dot${i === state.idx ? ' on' : ''}" data-i="${i}" aria-label="${esc(n)}"></button>`).join('');
+
+  $('domains').innerHTML = COLUMNS.filter((c) => c.kind === 'domain').map((c) => tile(c, cells?.[c.id], handle)).join('');
+  $('socials').innerHTML = COLUMNS.filter((c) => c.kind === 'social').map((c) => tile(c, cells?.[c.id], handle)).join('');
+
+  const s = score(cells);
+  document.documentElement.style.setProperty('--score', s.toFixed(3));
+  $('pct').textContent = cells ? `${Math.round(s * 100)}%` : '';
 }
 
 function status(text, isError) {
   $('status').textContent = text;
-  $('status').className = isError ? 'error' : '';
+  $('status').className = `status${isError ? ' error' : ''}`;
 }
 
-$('form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const brand = clean($('name').value);
-  if (!brand) return;
-  $('go').disabled = true;
+async function check(name) {
   try {
-    let industries = [...new Set($('industries').value.split(/[,;\n]/).map(clean).filter((i) => i && i !== brand))].slice(0, 8);
-    if (!industries.length) {
-      industries = DEFAULT_INDUSTRIES;
-      $('industries').value = industries.join(', ');
-    }
-    const rows = [brand, ...industries.map((i) => `${brand} ${i}`)].map((name) => ({ name }));
-    let columns = [];
-    render(rows, columns);
-    status('Checking domains and handles — rows fill in as they finish…');
-
-    // Two names at a time keeps each site from seeing a burst.
-    let next = 0;
-    const worker = async () => {
-      while (next < rows.length) {
-        const row = rows[next++];
-        try {
-          row.report = await api(`/api/brand?name=${encodeURIComponent(row.name)}`);
-          columns = row.report.columns;
-        } catch (err) {
-          row.error = err.message;
-        }
-        render(rows, columns);
-      }
-    };
-    await Promise.all([worker(), worker()]);
-
-    const free = rows.flatMap((r) => (r.report ? Object.values(r.report.rows[0].cells) : []))
-      .filter((c) => c.status === 'available').length;
-    const failed = rows.filter((r) => r.error).length;
-    status(`${rows.length} names checked — ${free} free spots found.` + (failed ? ` ${failed} couldn't be checked, try again.` : ''));
-  } catch (err) {
-    status(err.message, true);
-  } finally {
-    $('go').disabled = false;
+    const res = await fetch(`/api/brand?name=${encodeURIComponent(name)}`);
+    const data = await res.json().catch(() => ({}));
+    state.results.set(name, res.ok ? data : { error: data.error || `Couldn't check (${res.status})` });
+  } catch {
+    state.results.set(name, { error: "Couldn't reach the checker" });
   }
+  update();
+}
+
+async function run(brandText) {
+  const brand = clean(brandText);
+  if (!brand) return status('Type a brand name first.', true);
+  const branches = BRANCHES.filter((b) => state.on.has(b) && b !== brand);
+  state.names = [brand, ...branches.map((b) => `${brand} ${b}`)];
+  state.idx = 0;
+  state.running = true;
+  history.replaceState(null, '', `?name=${encodeURIComponent(brand)}&b=${branches.join(',')}`);
+  status('Checking — tiles light up as answers come in.');
+  update();
+
+  // Two names at a time, in order, so the one on screen lands first.
+  const queue = state.names.filter((n) => !state.results.has(n) || state.results.get(n).error);
+  queue.forEach((n) => state.results.delete(n));
+  update();
+  const worker = async () => { while (queue.length) await check(queue.shift()); };
+  await Promise.all([worker(), worker()]);
+
+  state.running = false;
+  const free = state.names.flatMap((n) => Object.values(state.results.get(n)?.rows?.[0]?.cells || {}))
+    .filter((c) => c.status === 'available').length;
+  status(`${state.names.length} names checked — ${free} free spots. Use ‹ › to step through.`);
+  update();
+}
+
+function go(delta) {
+  state.idx = Math.max(0, Math.min(state.names.length - 1, state.idx + delta));
+  update();
+}
+
+$('form').addEventListener('submit', (e) => { e.preventDefault(); if (!state.running) run($('name').value); });
+$('chips').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip')?.dataset.b;
+  if (!b) return;
+  state.on.has(b) ? state.on.delete(b) : state.on.size < 8 && state.on.add(b);
+  update();
 });
+$('prev').addEventListener('click', () => go(-1));
+$('next').addEventListener('click', () => go(1));
+$('dots').addEventListener('click', (e) => { const i = e.target.dataset.i; if (i !== undefined) { state.idx = +i; update(); } });
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowLeft') go(-1);
+  if (e.key === 'ArrowRight') go(1);
+});
+$('help-btn').addEventListener('click', () => {
+  const open = $('help').hidden;
+  $('help').hidden = !open;
+  $('help-btn').setAttribute('aria-expanded', String(open));
+  $('help-btn').textContent = open ? '×' : '?';
+});
+
+// A shared link (?name=berjaya&b=food,hotels) runs straight away — no typing.
+const params = new URLSearchParams(location.search);
+if (params.has('b')) state.on = new Set(params.get('b').split(',').filter((b) => BRANCHES.includes(b)));
+update();
+window.addEventListener('load', () => $('loader').classList.add('gone'));
+if (params.get('name')) {
+  $('name').value = params.get('name');
+  run(params.get('name'));
+} else {
+  $('name').focus();
+}
 </script>
 </body>
 </html>
