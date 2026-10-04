@@ -1,4 +1,5 @@
-import { defineCollection, z } from 'astro:content';
+import { defineCollection } from 'astro:content';
+import { z } from 'astro/zod';
 import { glob } from 'astro/loaders';
 
 // Shared shape for every catalog item, regardless of category.
@@ -15,15 +16,15 @@ const itemSchema = z.object({
   cover: z.string().optional(),
   // A live, embeddable URL rendered as an iframe preview when there's no static `cover` —
   // useful for something that's already hosted and responsive (see stockscreen.md).
-  embed: z.string().url().optional(),
+  embed: z.url().optional(),
   links: z
     .object({
       // Absolute URL for an external demo, or a root-relative path (e.g. "/play/x/")
       // for something self-hosted in this same site's public/ — resolved against
       // BASE_URL at render time so it survives a host/base-path change.
       demo: z.string().optional(),
-      repo: z.string().url().optional(),
-      other: z.string().url().optional(),
+      repo: z.url().optional(),
+      other: z.url().optional(),
     })
     .default({}),
   featured: z.boolean().default(false),
