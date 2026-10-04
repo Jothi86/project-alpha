@@ -38,3 +38,16 @@ cover art isn't always available), bold uppercase section labels, cobalt blue ac
 for games, teal for tools, violet for projects, alert red for "coming soon" badges and
 CTAs. Keep new pages consistent with `src/styles/global.css` and `ItemCard.astro`
 rather than introducing new patterns.
+
+## Every tool page under public/play/
+
+Ships with, from the first publish:
+
+- **Share button**: the sheet (WhatsApp, Telegram, Facebook, X, LinkedIn, email, copy
+  link, phone share menu), an `og-image.png` (1200×630) and `og:`/`twitter:` meta.
+  If the page has a state worth sharing, put it in the URL so the shared link reopens it.
+- **Add to home screen**: `manifest.webmanifest` (scoped to the page's folder), icons
+  (192, 512, maskable 512, 180 apple-touch), a network-first `sw.js` that never caches
+  `/api/`, the `beforeinstallprompt` button and the iPhone two-tap steps.
+
+Copy from `name-card-scanner/` or `brand-checker/`.
