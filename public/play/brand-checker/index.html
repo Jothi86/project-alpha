@@ -90,6 +90,10 @@
   .go { margin-top: 18px; padding: 12px 34px; border: 0; border-radius: 999px; background: var(--red);
         color: #fff; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
   .go:disabled { opacity: .5; cursor: progress; }
+  .reset { margin: 18px 0 0 8px; padding: 11px 22px; border-radius: 999px; border: 1px solid var(--border);
+           background: var(--raised); color: var(--muted); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .reset:hover { color: var(--fg); border-color: var(--muted); }
+  .reset[hidden] { display: none; }
 
   /* --- Stage: the sign + tiles --- */
   .stage { min-width: 0; }
@@ -279,7 +283,7 @@
       <span class="chip-set" id="chips"></span>
       <input class="chip" id="add" placeholder="+ your own" maxlength="20" autocomplete="off" autocapitalize="off" aria-label="Add your own branch">
     </div>
-    <button class="go" id="go" type="submit">Check</button>
+    <button class="go" id="go" type="submit">Check</button><button class="reset" id="reset" type="button" hidden>Reset</button>
     <div class="status" id="status"></div>
   </form>
 
@@ -342,7 +346,7 @@ const WEIGHT = { available: 1, unknown: 1 / 3, taken: 0, invalid: 0 };
 
 const MAX_ON = 8;
 // extra: branches visitors typed themselves, shown as chips after the preset ones.
-const state = { on: new Set(DEFAULT_ON), extra: [], names: [], idx: 0, results: new Map(), running: false, review: null };
+const state = { on: new Set(DEFAULT_ON), extra: [], names: [], idx: 0, results: new Map(), running: false, review: null, gen: 0 };
 const allBranches = () => [...BRANCHES, ...state.extra];
 
 // Adds a typed branch as a chip, switched on. Returns false if it couldn't go on.
@@ -381,6 +385,7 @@ function update() {
   $('chips').innerHTML = allBranches().map((b) =>
     `<button type="button" class="chip" data-b="${esc(b)}" aria-pressed="${state.on.has(b)}">${esc(b)}</button>`).join('');
   $('go').disabled = state.running;
+  $('reset').hidden = !state.names.length && !$('name').value && !state.extra.length;
   if (!state.names.length) return;
 
   $('app').classList.remove('idle');
@@ -458,15 +463,33 @@ function status(text, isError) {
   $('status').className = `status${isError ? ' error' : ''}`;
 }
 
-async function check(name) {
+// gen: which run asked. After a Reset, answers from the old run are dropped.
+async function check(name, gen) {
+  let result;
   try {
     const res = await fetch(`/api/brand?name=${encodeURIComponent(name)}`);
     const data = await res.json().catch(() => ({}));
-    state.results.set(name, res.ok ? data : { error: data.error || `Couldn't check (${res.status})` });
+    result = res.ok ? data : { error: data.error || `Couldn't check (${res.status})` };
   } catch {
-    state.results.set(name, { error: "Couldn't reach the checker" });
+    result = { error: "Couldn't reach the checker" };
   }
+  if (gen !== state.gen) return;
+  state.results.set(name, result);
   update();
+}
+
+// Back to a blank page: no name, standard branches, nothing checked.
+function reset() {
+  state.gen++;
+  Object.assign(state, { on: new Set(DEFAULT_ON), extra: [], names: [], idx: 0, results: new Map(), running: false, review: null });
+  $('name').value = '';
+  $('add').value = '';
+  history.replaceState(null, '', location.pathname);
+  status('');
+  document.documentElement.style.setProperty('--score', '0');
+  $('app').classList.add('idle');
+  update();
+  $('name').focus();
 }
 
 async function run(brandText) {
@@ -477,6 +500,7 @@ async function run(brandText) {
   state.idx = 0;
   state.running = true;
   state.review = null;
+  const gen = ++state.gen;
   history.replaceState(null, '', `?name=${encodeURIComponent(brand)}&b=${encodeURIComponent(branches.join(','))}`);
   status('Checking — tiles light up as answers come in.');
   update();
@@ -485,8 +509,9 @@ async function run(brandText) {
   const queue = state.names.filter((n) => !state.results.has(n) || state.results.get(n).error);
   queue.forEach((n) => state.results.delete(n));
   update();
-  const worker = async () => { while (queue.length) await check(queue.shift()); };
+  const worker = async () => { while (queue.length && gen === state.gen) await check(queue.shift(), gen); };
   await Promise.all([worker(), worker()]);
+  if (gen !== state.gen) return; // reset while checking
 
   state.running = false;
   const free = state.names.flatMap((n) => Object.values(state.results.get(n)?.rows?.[0]?.cells || {}))
@@ -524,6 +549,8 @@ $('chips').addEventListener('click', (e) => {
   update();
 });
 $('look').addEventListener('click', startReview);
+$('reset').addEventListener('click', reset);
+$('name').addEventListener('input', () => { $('reset').hidden = !state.names.length && !$('name').value && !state.extra.length; });
 $('review').addEventListener('click', (e) => { const a = e.target.dataset.a; if (a) answer(a); });
 $('prev').addEventListener('click', () => go(-1));
 $('next').addEventListener('click', () => go(1));
