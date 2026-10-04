@@ -136,6 +136,32 @@
   .tile .alt { display: block; font-size: 11px; color: var(--teal); margin-top: 3px; }
   @keyframes pulse { 50% { opacity: .35; } }
 
+  /* --- Trademarks: a verdict, the marks on record, and the registers to check by hand --- */
+  .tm-card { padding: 16px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); margin-bottom: 10px; }
+  .tm-card.clear { border-color: var(--teal); background: #10302a; }
+  .tm-card.risk { border-color: #5a1f1c; }
+  .tm-card.similar { border-color: #5a4a1c; }
+  .tm-verdict { font-size: 18px; font-weight: 800; }
+  .clear .tm-verdict { color: var(--teal); }
+  .risk .tm-verdict { color: #f0766f; }
+  .similar .tm-verdict { color: var(--amber); }
+  .tm-why { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .tm-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+  .tm-list a { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 9px 11px; border-radius: 10px;
+               background: var(--raised); border: 1px solid var(--border); font-size: 13px; }
+  .tm-list a:hover { border-color: var(--muted); }
+  .tm-list .mk { font-weight: 800; }
+  .tm-list .st { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; align-self: center; }
+  .tm-list .st.live { color: #f0766f; }
+  .tm-list .st.dead { color: var(--muted); }
+  .tm-list .meta { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+  .tm-more { display: inline-block; margin-top: 10px; font-size: 13px; color: var(--teal); }
+  .tm-extra { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .tm-extra > * { padding: 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); font-size: 13px; }
+  .tm-extra strong { display: block; margin-bottom: 3px; }
+  .tm-extra span { color: var(--muted); }
+  .tm-extra a:hover { border-color: var(--muted); }
+
   /* --- Meter: how open is this name? --- */
   .meter { position: relative; display: flex; flex-direction: column; align-items: center; }
   .meter .bar { position: relative; width: 10px; flex: 1; min-height: 260px; border-radius: 999px;
@@ -292,6 +318,7 @@
     <p><strong>Free / Taken / Check.</strong> Free means no one has it. Taken means it's registered. Check means the site hides it behind a login or blocked the lookup — tap the tile to look yourself.</p>
     <p><strong>The meter and the glow.</strong> Each Free counts fully and each Check counts a third. The more of a name is still open, the brighter the sign and the higher the needle.</p>
     <p><strong>Look yourself.</strong> "Look at the grey ones" opens each Check site in one other tab, where you're already logged in. Tap Free or Taken for what you see and it moves on to the next; your answers count in the meter.</p>
+    <p><strong>Trademarks.</strong> Searched on TMview, which carries Malaysia's MyIPO register and about 80 others. Red means a live trademark for this exact name in Malaysia; the class says what goods or services it covers. A guide, not legal advice — see a trademark agent before you commit.</p>
     <p><strong>Underscores.</strong> When berjayafood is taken, it also tries berjaya_food and shows it under the tile if that one is free.</p>
   </section>
 
@@ -307,6 +334,8 @@
     <div class="tiles" id="domains"></div>
     <p class="group-label">Social media</p>
     <div class="tiles" id="socials"></div>
+    <p class="group-label">Trademarks &amp; registration</p>
+    <div class="tm" id="tm"></div>
   </section>
 
   <aside class="meter" aria-label="How open this name is">
@@ -346,7 +375,7 @@ const WEIGHT = { available: 1, unknown: 1 / 3, taken: 0, invalid: 0 };
 
 const MAX_ON = 8;
 // extra: branches visitors typed themselves, shown as chips after the preset ones.
-const state = { on: new Set(DEFAULT_ON), extra: [], names: [], idx: 0, results: new Map(), running: false, review: null, gen: 0 };
+const state = { on: new Set(DEFAULT_ON), extra: [], names: [], idx: 0, results: new Map(), running: false, review: null, gen: 0, tm: new Map() };
 const allBranches = () => [...BRANCHES, ...state.extra];
 
 // Adds a typed branch as a chip, switched on. Returns false if it couldn't go on.
@@ -380,6 +409,81 @@ function tile(col, cell, handle) {
     `<div class="site">${esc(site)}</div><div class="state">${STATE[status]}</div>${why}${alt}</a>`;
 }
 
+// Nice classes in a few words, so "class 43" reads as what it covers.
+const CLASSES = ['', 'chemicals', 'paints', 'cosmetics & cleaning', 'fuels & oils', 'medicines', 'metal goods',
+  'machines', 'hand tools', 'electronics & software', 'medical devices', 'lighting & appliances', 'vehicles',
+  'firearms & fireworks', 'jewellery & watches', 'musical instruments', 'paper & print', 'rubber & plastics',
+  'leather & bags', 'building materials', 'furniture', 'kitchenware', 'ropes & sacks', 'yarns', 'textiles',
+  'clothing', 'haberdashery', 'carpets', 'toys & sports', 'meat, dairy & prepared food', 'coffee, bakery & staples',
+  'fresh produce', 'beer & soft drinks', 'alcoholic drinks', 'tobacco', 'advertising & retail', 'finance & property',
+  'construction', 'telecoms', 'transport & travel', 'manufacturing services', 'education & entertainment',
+  'IT & science', 'restaurants & hotels', 'medical & beauty services', 'legal & security'];
+const classText = (list) => list.map((c) => `${c} ${CLASSES[c] || ''}`.trim()).join(', ');
+
+// Trademarks load on their own, once per name, when that name is on screen.
+async function loadTrademarks(name) {
+  const gen = state.gen;
+  state.tm.set(name, { loading: true });
+  let result;
+  try {
+    const res = await fetch(`/api/trademark?name=${encodeURIComponent(name)}`);
+    const data = await res.json().catch(() => ({}));
+    result = res.ok ? data : { error: data.error || `Couldn't search (${res.status})` };
+  } catch {
+    result = { error: "Couldn't reach the trademark register" };
+  }
+  if (gen !== state.gen) return;
+  state.tm.set(name, result);
+  update();
+}
+
+function trademarks(name) {
+  const t = state.tm.get(name);
+  const q = encodeURIComponent(name);
+  const extra = `<div class="tm-extra">
+    <a href="https://www.ssm.com.my/Pages/e-Search.aspx" target="_blank" rel="noopener"><strong>Company &amp; business names</strong>
+      <span>Registered with SSM — check on SSM e-Search (needs an SSM login).</span></a>
+    <div><strong>Copyright</strong><span>Names and slogans can't be copyrighted in Malaysia; a trademark is what protects a name. A logo is protected by copyright automatically.</span></div>
+  </div>`;
+  if (!t || t.loading) return `<div class="tm-card"><div class="tm-why">Searching the trademark registers…</div></div>${extra}`;
+  if (t.error) {
+    return `<div class="tm-card"><div class="tm-verdict">Couldn't check</div><div class="tm-why">${esc(t.error)} — ` +
+      `<a class="tm-more" href="https://www.tmdn.org/tmview/#/tmview/results?page=1&pageSize=30&criteria=C&basicSearch=${q}&fOffices=MY" target="_blank" rel="noopener">search TMview yourself</a></div></div>${extra}`;
+  }
+
+  const my = t.malaysia;
+  const world = t.world;
+  const abroad = world.offices.filter((o) => o !== 'MY');
+  let kind, verdict, why;
+  if (my.liveExact) {
+    kind = 'risk';
+    verdict = `Trademarked in Malaysia`;
+    why = `${my.liveExact} live trademark${my.liveExact === 1 ? '' : 's'} for exactly "${name}". Using it for the same goods or services could infringe — check the classes below.`;
+  } else if (my.live) {
+    kind = 'similar';
+    verdict = 'Similar trademarks in Malaysia';
+    why = `${my.live} live mark${my.live === 1 ? '' : 's'} contain "${name}", but none is exactly it. Similar names can still clash in the same class.`;
+  } else if (world.liveExact) {
+    kind = 'similar';
+    verdict = 'Trademarked abroad only';
+    why = `Nothing live in Malaysia. Registered elsewhere: ${abroad.join(', ')} — matters if you plan to sell there.`;
+  } else {
+    kind = 'clear';
+    verdict = 'No trademarks found';
+    why = 'No live trademark for this name in Malaysia or the ~80 other registers TMview covers.';
+  }
+  // Malaysian marks first; then the identical ones abroad.
+  const shown = [...my.marks, ...world.marks.filter((m) => m.office !== 'MY' && m.live)].slice(0, 8);
+  const list = shown.map((m) => `<li><a href="${esc(m.url)}" target="_blank" rel="noopener">
+      <span class="mk">${esc(m.name)} <small>· ${esc(m.office)}</small></span>
+      <span class="st ${m.live ? 'live' : 'dead'}">${esc(m.status)}</span>
+      <span class="meta">${esc(m.owner)}${m.classes.length ? ` · class ${esc(classText(m.classes))}` : ''}</span></a></li>`).join('');
+  const more = my.total > shown.length
+    ? `<a class="tm-more" href="${esc(t.links.malaysia)}" target="_blank" rel="noopener">See all ${my.total} Malaysian records on TMview →</a>` : '';
+  return `<div class="tm-card ${kind}"><div class="tm-verdict">${verdict}</div><div class="tm-why">${esc(why)}</div>` +
+    `${list ? `<ul class="tm-list">${list}</ul>` : ''}${more}</div>${extra}`;
+}
+
 // One redraw for everything, after every change.
 function update() {
   $('chips').innerHTML = allBranches().map((b) =>
@@ -403,6 +507,8 @@ function update() {
 
   $('domains').innerHTML = COLUMNS.filter((c) => c.kind === 'domain').map((c) => tile(c, cells?.[c.id], handle)).join('');
   $('socials').innerHTML = COLUMNS.filter((c) => c.kind === 'social').map((c) => tile(c, cells?.[c.id], handle)).join('');
+  if (!state.tm.has(name)) loadTrademarks(name);
+  $('tm').innerHTML = trademarks(name);
 
   const s = score(cells);
   document.documentElement.style.setProperty('--score', s.toFixed(3));
@@ -481,7 +587,7 @@ async function check(name, gen) {
 // Back to a blank page: no name, standard branches, nothing checked.
 function reset() {
   state.gen++;
-  Object.assign(state, { on: new Set(DEFAULT_ON), extra: [], names: [], idx: 0, results: new Map(), running: false, review: null });
+  Object.assign(state, { on: new Set(DEFAULT_ON), extra: [], names: [], idx: 0, results: new Map(), running: false, review: null, tm: new Map() });
   $('name').value = '';
   $('add').value = '';
   history.replaceState(null, '', location.pathname);

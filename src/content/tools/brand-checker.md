@@ -11,7 +11,9 @@ links:
 
 Type one brand name, say "berjaya", and the checker looks it up everywhere it
 matters: the .com, .my and .com.my domains, plus Instagram, TikTok, YouTube,
-Threads, Telegram, Facebook, X and LinkedIn.
+Threads, Telegram, Facebook, X and LinkedIn. It also searches the trademark
+registers (Malaysia's MyIPO and about 80 others, through TMview) and tells you if
+the name is already trademarked, and for what.
 
 It does the same for each branch the brand might grow into, like "berjaya food" and
 "berjaya hotels". Tap the branches you want, or type your own, then step through
