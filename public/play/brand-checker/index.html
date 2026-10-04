@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brand Checker</title>
+<meta name="description" content="Is your brand name free? Check .com, .my and .com.my domains plus Instagram, TikTok, YouTube and more — for the brand and its branches. Free.">
+<link rel="canonical" href="https://project-alpha-dlz.pages.dev/play/brand-checker/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Brand Checker">
+<meta property="og:description" content="One name in, every domain and social handle out — for the brand and its branches. Free.">
+<meta property="og:url" content="https://project-alpha-dlz.pages.dev/play/brand-checker/">
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e3df;
+    --accent: #2f5bd3; --free: #1f7a46; --free-bg: #e3f4ea; --taken: #b4352b; --taken-bg: #fbe7e5;
+    --unknown: #6b6b66; --unknown-bg: #efeeea; --invalid: #8a6d1c; --invalid-bg: #fbf2d9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --panel: #1f1f1d; --text: #ecebe6; --muted: #9c9b95; --line: #33332f;
+      --accent: #7f9ef0; --free: #7fd3a0; --free-bg: #1d3727; --taken: #f0928a; --taken-bg: #3e2220;
+      --unknown: #b3b2ab; --unknown-bg: #2a2a27; --invalid: #e5c46b; --invalid-bg: #3a321b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  form { display: grid; grid-template-columns: 1fr 2fr auto; gap: 10px; align-items: start;
+         background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted);
+          text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  input { width: 100%; padding: 10px 12px; font: inherit; color: var(--text); background: var(--bg);
+          border: 1px solid var(--line); border-radius: 8px; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { padding: 10px 18px; font: inherit; font-weight: 600; color: #fff; background: var(--accent);
+           border: 0; border-radius: 8px; cursor: pointer; }
+  form button { margin-top: 23px; }
+  button:disabled { opacity: .6; cursor: progress; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  #status { margin: 18px 0 10px; color: var(--muted); min-height: 1.4em; }
+  #status.error { color: var(--taken); }
+  .wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; min-width: 900px; }
+  th, td { padding: 10px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap; }
+  thead th { font-size: 12px; color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+  thead th.group { border-bottom: 0; padding-bottom: 0; }
+  tbody tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
+  tbody th { text-align: left; font-weight: 600; }
+  tr > th:first-child { position: sticky; left: 0; z-index: 1; background: var(--panel); border-right: 1px solid var(--line); }
+  tbody th small { display: block; font-weight: 400; color: var(--muted); }
+  .sep { border-left: 1px solid var(--line); }
+  a.chip { display: inline-block; min-width: 64px; padding: 3px 9px; border-radius: 999px; font-size: 12px;
+           font-weight: 600; text-decoration: none; }
+  .available { color: var(--free); background: var(--free-bg); }
+  .taken { color: var(--taken); background: var(--taken-bg); }
+  .unknown { color: var(--unknown); background: var(--unknown-bg); }
+  .invalid { color: var(--invalid); background: var(--invalid-bg); }
+  .alt { display: block; font-size: 11px; margin-top: 3px; color: var(--free); text-decoration: none; }
+  .note { display: block; font-size: 11px; margin-top: 3px; color: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .legend span.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-weight: 600; font-size: 12px; margin-right: 4px; }
+  .back { display: inline-block; margin-bottom: 16px; color: var(--muted); text-decoration: none; font-size: 13px; }
+  .back:hover { color: var(--accent); }
+  td.wait { color: var(--muted); font-size: 12px; }
+  @media (max-width: 720px) { form { grid-template-columns: 1fr; } form button { width: 100%; margin-top: 4px; } }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="/">← project alpha</a>
+  <h1>Brand Checker</h1>
+  <p class="sub">One name in, every domain and social handle out — for the brand and its branches.</p>
+
+  <form id="form">
+    <div>
+      <label for="name">Brand</label>
+      <input id="name" placeholder="berjaya" autocomplete="off" required>
+    </div>
+    <div>
+      <label for="industries">Branches</label>
+      <input id="industries" placeholder="Leave empty for food, beverages, properties, hotels, holdings" autocomplete="off">
+      <div class="hint">Comma separated, e.g. food, beverages, properties</div>
+    </div>
+    <button id="go" type="submit">Check</button>
+  </form>
+
+  <div id="status"></div>
+  <div class="wrap" id="results" hidden></div>
+  <div class="legend" id="legend" hidden>
+    <div><span class="chip available">Free</span>no one has it</div>
+    <div><span class="chip taken">Taken</span>already registered</div>
+    <div><span class="chip unknown">Check</span>site hides it behind a login — click to look</div>
+    <div><span class="chip invalid">Not allowed</span>too long or short for that site</div>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const LABEL = { available: 'Free', taken: 'Taken', unknown: 'Check', invalid: 'Not allowed' };
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function api(path) {
+  const res = await fetch(path);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+function cell(c) {
+  const title = c.note ? ` title="${esc(c.note)}"` : '';
+  let html = `<a class="chip ${c.status}" href="${esc(c.url)}" target="_blank" rel="noopener"${title}>${LABEL[c.status]}</a>`;
+  if (c.note) html += `<span class="note">${esc(c.note)}</span>`;
+  if (c.alt) html += `<a class="alt" href="${esc(c.alt.url)}" target="_blank" rel="noopener">${esc(c.alt.handle)} free</a>`;
+  return html;
+}
+
+// Same names the bot uses: the brand, then "brand branch" for each branch.
+const DEFAULT_INDUSTRIES = ['food', 'beverages', 'properties', 'hotels', 'holdings'];
+const clean = (s) => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const COLUMN_COUNT = 11;
+
+// rows: [{ name, report? , error? }] — rows without a report show as still checking.
+function render(rows, columns) {
+  const domains = columns.filter((c) => c.kind === 'domain');
+  const socials = columns.filter((c) => c.kind === 'social');
+  const head = columns.length
+    ? `<tr><th class="group"></th><th class="group sep" colspan="${domains.length}">Websites</th>` +
+      `<th class="group sep" colspan="${socials.length}">Social media</th></tr>` +
+      `<tr><th></th>${domains.map((c, i) => `<th${i === 0 ? ' class="sep"' : ''}>${esc(c.label)}</th>`).join('')}` +
+      `${socials.map((c, i) => `<th${i === 0 ? ' class="sep"' : ''}>${esc(c.label)}</th>`).join('')}</tr>`
+    : '';
+  const body = rows.map(({ name, report, error }) => {
+    const row = report?.rows[0];
+    const label = `<th>${esc(name)}<small>@${esc(name.replace(/ /g, ''))}</small></th>`;
+    if (!row) {
+      const span = columns.length || COLUMN_COUNT;
+      return `<tr>${label}<td class="wait sep" colspan="${span}">${error ? esc(error) : 'Checking…'}</td></tr>`;
+    }
+    return `<tr>${label}` +
+      domains.map((c, i) => `<td${i === 0 ? ' class="sep"' : ''}>${cell(row.cells[c.id])}</td>`).join('') +
+      socials.map((c, i) => `<td${i === 0 ? ' class="sep"' : ''}>${cell(row.cells[c.id])}</td>`).join('') +
+      `</tr>`;
+  }).join('');
+  $('results').innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  $('results').hidden = false;
+  $('legend').hidden = false;
+}
+
+function status(text, isError) {
+  $('status').textContent = text;
+  $('status').className = isError ? 'error' : '';
+}
+
+$('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const brand = clean($('name').value);
+  if (!brand) return;
+  $('go').disabled = true;
+  try {
+    let industries = [...new Set($('industries').value.split(/[,;\n]/).map(clean).filter((i) => i && i !== brand))].slice(0, 8);
+    if (!industries.length) {
+      industries = DEFAULT_INDUSTRIES;
+      $('industries').value = industries.join(', ');
+    }
+    const rows = [brand, ...industries.map((i) => `${brand} ${i}`)].map((name) => ({ name }));
+    let columns = [];
+    render(rows, columns);
+    status('Checking domains and handles — rows fill in as they finish…');
+
+    // Two names at a time keeps each site from seeing a burst.
+    let next = 0;
+    const worker = async () => {
+      while (next < rows.length) {
+        const row = rows[next++];
+        try {
+          row.report = await api(`/api/brand?name=${encodeURIComponent(row.name)}`);
+          columns = row.report.columns;
+        } catch (err) {
+          row.error = err.message;
+        }
+        render(rows, columns);
+      }
+    };
+    await Promise.all([worker(), worker()]);
+
+    const free = rows.flatMap((r) => (r.report ? Object.values(r.report.rows[0].cells) : []))
+      .filter((c) => c.status === 'available').length;
+    const failed = rows.filter((r) => r.error).length;
+    status(`${rows.length} names checked — ${free} free spots found.` + (failed ? ` ${failed} couldn't be checked, try again.` : ''));
+  } catch (err) {
+    status(err.message, true);
+  } finally {
+    $('go').disabled = false;
+  }
+});
+</script>
+</body>
+</html>
