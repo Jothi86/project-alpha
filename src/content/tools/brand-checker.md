@@ -14,8 +14,8 @@ matters: the .com, .my and .com.my domains, plus Instagram, TikTok, YouTube,
 Threads, Telegram, Facebook, X and LinkedIn.
 
 It does the same for each branch the brand might grow into, like "berjaya food" and
-"berjaya hotels". Tap the branches you want, then step through each name with the
-arrows.
+"berjaya hotels". Tap the branches you want, or type your own, then step through
+each name with the arrows.
 
 The name glows brighter, and the meter climbs, the more of it is still free. Every
 tile is a link. Green means free, red means taken, and grey means the site hides it

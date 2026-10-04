@@ -47,6 +47,10 @@
   .chip { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--border); background: var(--raised);
           font-size: 13px; font-weight: 700; color: var(--muted); text-transform: lowercase; }
   .chip[aria-pressed="true"] { color: var(--fg); border-color: var(--teal); background: #12312b; }
+  .chip-set { display: contents; }
+  input.chip { width: 130px; border-style: dashed; font-family: var(--font); text-transform: none; }
+  input.chip:focus { outline: none; border-color: var(--teal); color: var(--fg); }
+  input.chip::placeholder { color: var(--muted); }
   .go { margin-top: 18px; padding: 12px 34px; border: 0; border-radius: 999px; background: var(--red);
         color: #fff; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
   .go:disabled { opacity: .5; cursor: progress; }
@@ -148,13 +152,16 @@
 <main id="app" class="idle">
   <form id="form">
     <input class="name-in" id="name" placeholder="Your brand" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Brand name">
-    <div class="chips" id="chips" aria-label="Branches to check"></div>
+    <div class="chips" aria-label="Branches to check">
+      <span class="chip-set" id="chips"></span>
+      <input class="chip" id="add" placeholder="+ your own" maxlength="20" autocomplete="off" autocapitalize="off" aria-label="Add your own branch">
+    </div>
     <button class="go" id="go" type="submit">Check</button>
     <div class="status" id="status"></div>
   </form>
 
   <section class="help" id="help" hidden>
-    <p><strong>What it checks.</strong> The .com, .my and .com.my domains, plus Instagram, TikTok, YouTube, Threads, Telegram, Facebook, X and LinkedIn — for the brand and each branch you switch on.</p>
+    <p><strong>What it checks.</strong> The .com, .my and .com.my domains, plus Instagram, TikTok, YouTube, Threads, Telegram, Facebook, X and LinkedIn — for the brand and each branch you switch on. Type a branch of your own in "+ your own" and press Enter; up to 8 at once.</p>
     <p><strong>Free / Taken / Check.</strong> Free means no one has it. Taken means it's registered. Check means the site hides it behind a login or blocked the lookup — tap the tile to look yourself.</p>
     <p><strong>The meter and the glow.</strong> Each Free counts fully and each Check counts a third. The more of a name is still open, the brighter the sign and the higher the needle.</p>
     <p><strong>Underscores.</strong> When berjayafood is taken, it also tries berjaya_food and shows it under the tile if that one is free.</p>
@@ -198,7 +205,24 @@ const STATE = { available: 'Free', taken: 'Taken', unknown: 'Check', invalid: 'N
 // How much each answer counts toward "open": Free fully, Check a third.
 const WEIGHT = { available: 1, unknown: 1 / 3, taken: 0, invalid: 0 };
 
-const state = { on: new Set(DEFAULT_ON), names: [], idx: 0, results: new Map(), running: false };
+const MAX_ON = 8;
+// extra: branches visitors typed themselves, shown as chips after the preset ones.
+const state = { on: new Set(DEFAULT_ON), extra: [], names: [], idx: 0, results: new Map(), running: false };
+const allBranches = () => [...BRANCHES, ...state.extra];
+
+// Adds a typed branch as a chip, switched on. Returns false if it couldn't go on.
+function addBranch(text) {
+  const b = clean(text).slice(0, 20);
+  if (!b) return true;
+  if (!allBranches().includes(b)) state.extra.push(b);
+  if (state.on.has(b)) return true;
+  if (state.on.size >= MAX_ON) {
+    status(`Up to ${MAX_ON} branches at once — switch one off first.`, true);
+    return false;
+  }
+  state.on.add(b);
+  return true;
+}
 
 function score(cells) {
   const known = COLUMNS.map((c) => cells?.[c.id]).filter(Boolean);
@@ -218,8 +242,8 @@ function tile(col, cell, handle) {
 
 // One redraw for everything, after every change.
 function update() {
-  $('chips').innerHTML = BRANCHES.map((b) =>
-    `<button type="button" class="chip" data-b="${b}" aria-pressed="${state.on.has(b)}">${b}</button>`).join('');
+  $('chips').innerHTML = allBranches().map((b) =>
+    `<button type="button" class="chip" data-b="${esc(b)}" aria-pressed="${state.on.has(b)}">${esc(b)}</button>`).join('');
   $('go').disabled = state.running;
   if (!state.names.length) return;
 
@@ -263,11 +287,11 @@ async function check(name) {
 async function run(brandText) {
   const brand = clean(brandText);
   if (!brand) return status('Type a brand name first.', true);
-  const branches = BRANCHES.filter((b) => state.on.has(b) && b !== brand);
+  const branches = allBranches().filter((b) => state.on.has(b) && b !== brand);
   state.names = [brand, ...branches.map((b) => `${brand} ${b}`)];
   state.idx = 0;
   state.running = true;
-  history.replaceState(null, '', `?name=${encodeURIComponent(brand)}&b=${branches.join(',')}`);
+  history.replaceState(null, '', `?name=${encodeURIComponent(brand)}&b=${encodeURIComponent(branches.join(','))}`);
   status('Checking — tiles light up as answers come in.');
   update();
 
@@ -290,11 +314,26 @@ function go(delta) {
   update();
 }
 
-$('form').addEventListener('submit', (e) => { e.preventDefault(); if (!state.running) run($('name').value); });
+$('form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (state.running) return;
+  // A branch typed but not yet added with Enter still counts.
+  if (!addBranch($('add').value)) return update();
+  $('add').value = '';
+  run($('name').value);
+});
+$('add').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ',') return;
+  e.preventDefault(); // Enter here adds a branch; it doesn't start the check
+  if (addBranch($('add').value)) $('add').value = '';
+  update();
+});
 $('chips').addEventListener('click', (e) => {
   const b = e.target.closest('.chip')?.dataset.b;
   if (!b) return;
-  state.on.has(b) ? state.on.delete(b) : state.on.size < 8 && state.on.add(b);
+  if (state.on.has(b)) state.on.delete(b);
+  else if (state.on.size < MAX_ON) state.on.add(b);
+  else status(`Up to ${MAX_ON} branches at once — switch one off first.`, true);
   update();
 });
 $('prev').addEventListener('click', () => go(-1));
@@ -314,7 +353,10 @@ $('help-btn').addEventListener('click', () => {
 
 // A shared link (?name=berjaya&b=food,hotels) runs straight away — no typing.
 const params = new URLSearchParams(location.search);
-if (params.has('b')) state.on = new Set(params.get('b').split(',').filter((b) => BRANCHES.includes(b)));
+if (params.has('b')) {
+  state.on = new Set();
+  params.get('b').split(',').slice(0, MAX_ON).forEach(addBranch);
+}
 update();
 window.addEventListener('load', () => $('loader').classList.add('gone'));
 if (params.get('name')) {
