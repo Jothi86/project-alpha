@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>PAC1F1C R1M</title>
+<meta name="description" content="An 8-bit giant-robot vs. sea-monster game: walk the Penang coast like a Game Boy RPG, then fight K41JU in first person from the J4GR cockpit. Free, in your browser.">
+<meta name="theme-color" content="#0f380f">
+<meta property="og:type" content="website">
+<meta property="og:title" content="PAC1F1C R1M">
+<meta property="og:description" content="Pilot GYPSY R4NG3R. Patrol the Penang coast, then fight K41JU in first person. A free 8-bit game in your browser.">
+<meta property="og:url" content="https://project-alpha-dlz.pages.dev/play/pac1f1c-r1m/">
+<meta property="og:image" content="https://project-alpha-dlz.pages.dev/play/pac1f1c-r1m/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PAC1F1C R1M">
+<script src="/kit/share-install.js" defer data-title="PAC1F1C R1M" data-text="8-bit J4GR vs K41JU — walk Penang like a Game Boy RPG, fight in first person. Free:"
+  data-url="https://project-alpha-dlz.pages.dev/play/pac1f1c-r1m/" data-mount=".top" data-accent="#8bac0f" data-sw="sw.js"></script>
+<style>
+  :root { --p0: #9bbc0f; --p1: #8bac0f; --p2: #306230; --p3: #0f380f; color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #111; color: #ddd; font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace;
+    display: flex; flex-direction: column; align-items: center; overflow-x: hidden;
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+    user-select: none; -webkit-user-select: none; touch-action: manipulation;
+  }
+  .top { width: 100%; max-width: 640px; display: flex; align-items: center; gap: 10px; padding: 10px 0 8px; flex-wrap: wrap; }
+  .top a { color: #aaa; text-decoration: none; font-size: 18px; }
+  .top h1 { margin: 0; font-size: 15px; letter-spacing: 2px; color: var(--p0); flex: 1; }
+  .shell {
+    background: var(--p3); padding: 8px; border-radius: 10px 10px 34px 10px;
+    box-shadow: 0 0 0 2px #000, 0 10px 30px #0008; max-width: 100%;
+  }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; background: var(--p0); }
+  .pad {
+    width: 100%; max-width: 420px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+    padding: 14px 4px 10px; touch-action: none; gap: 8px;
+  }
+  .dpad { position: relative; width: 132px; height: 132px; }
+  .dpad [data-btn] { position: absolute; width: 44px; height: 44px; background: #2a2a2a; border: 0; color: #888; font-size: 16px; }
+  .dpad [data-btn=up] { left: 44px; top: 0; border-radius: 8px 8px 0 0; }
+  .dpad [data-btn=down] { left: 44px; top: 88px; border-radius: 0 0 8px 8px; }
+  .dpad [data-btn=left] { left: 0; top: 44px; border-radius: 8px 0 0 8px; }
+  .dpad [data-btn=right] { left: 88px; top: 44px; border-radius: 0 8px 8px 0; }
+  .dpad .hub { position: absolute; left: 44px; top: 44px; width: 44px; height: 44px; background: #2a2a2a; }
+  .mid { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+  .mid [data-btn] { width: 58px; height: 18px; border-radius: 9px; background: #333; border: 0; color: #999; font: 9px ui-monospace, monospace; letter-spacing: 1px; }
+  .ab { position: relative; width: 132px; height: 120px; justify-self: end; }
+  .ab [data-btn] {
+    position: absolute; width: 58px; height: 58px; border-radius: 50%; border: 0;
+    background: var(--p2); color: var(--p0); font: bold 18px ui-monospace, monospace; box-shadow: 0 3px 0 #000;
+  }
+  .ab [data-btn=a] { right: 0; top: 4px; }
+  .ab [data-btn=b] { left: 0; top: 52px; }
+  [data-btn].on { filter: brightness(1.6); transform: translateY(2px); box-shadow: none; }
+  .hint, .fan { max-width: 520px; text-align: center; color: #777; margin: 4px 0; font-size: 12px; }
+  .fan { color: #555; font-size: 11px; padding-bottom: 14px; }
+  @media (pointer: fine) and (min-width: 700px) { .pad { display: none; } }
+  @media (pointer: coarse) { .hint { display: none; } }
+</style>
+</head>
+<body>
+  <header class="top">
+    <a href="/" aria-label="Back to catalog">&larr;</a>
+    <h1>PAC1F1C R1M</h1>
+  </header>
+  <div class="shell"><canvas id="screen" width="160" height="144" aria-label="Game screen"></canvas></div>
+  <div class="pad" id="pad">
+    <div class="dpad">
+      <button data-btn="up" aria-label="Up">&#9650;</button>
+      <button data-btn="left" aria-label="Left">&#9664;</button>
+      <div class="hub"></div>
+      <button data-btn="right" aria-label="Right">&#9654;</button>
+      <button data-btn="down" aria-label="Down">&#9660;</button>
+    </div>
+    <div class="mid">
+      <button data-btn="select">SELECT</button>
+      <button data-btn="start">START</button>
+    </div>
+    <div class="ab">
+      <button data-btn="b">B</button>
+      <button data-btn="a">A</button>
+    </div>
+  </div>
+  <p class="hint">Arrows / WASD move &middot; Z = A (hold to charge) &middot; X = B &middot; Enter = Start &middot; M = sound. In battle, left/right strafes and up/down aims.</p>
+  <p class="fan">A free fan tribute. Not affiliated with or endorsed by the owners of any film. All art and music are original.</p>
+  <script src="art.js"></script>
+  <script src="game.js"></script>
+  <script>
+    // Fit the 160x144 screen to the space above the pad.
+    (() => {
+      const cv = document.getElementById('screen'), pad = document.getElementById('pad');
+      function fit() {
+        const padH = getComputedStyle(pad).display === 'none' ? 40 : pad.offsetHeight;
+        const aw = Math.min(innerWidth - 48, 800), ah = innerHeight - padH - 110;
+        let k = Math.min(aw / 160, ah / 144);
+        k = k >= 3 ? Math.floor(k) : Math.max(1.5, Math.floor(k * 4) / 4);
+        cv.style.width = 160 * k + 'px'; cv.style.height = 144 * k + 'px';
+      }
+      addEventListener('resize', fit); fit();
+    })();
+  </script>
+</body>
+</html>
