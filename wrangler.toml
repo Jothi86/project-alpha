@@ -11,6 +11,13 @@ compatibility_date = "2026-09-01"
 [placement]
 mode = "smart"
 
+# Name Card Scanner: Gemini is called from a fixed US location through this
+# Durable Object (relay/, deployed by its own workflow).
+[[durable_objects.bindings]]
+name = "RELAY"
+class_name = "Relay"
+script_name = "card-reader-relay"
+
 # Name Card Scanner: daily counters and connected Telegram bots.
 [[kv_namespaces]]
 binding = "CARDS_KV"

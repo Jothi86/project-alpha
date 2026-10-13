@@ -81,7 +81,9 @@ const SCHEMA = {
 // through Cloudflare AI Gateway (env GEMINI_BASE_URL), which calls Google
 // from a supported region.
 const GOOGLE = 'https://generativelanguage.googleapis.com/v1beta';
-export async function readCard({ apiKey, base64, mimeType = 'image/jpeg', baseUrl = GOOGLE }) {
+// send: how the request is made (default fetch); the functions pass a relay
+// that makes the call from a fixed US location.
+export async function readCard({ apiKey, base64, mimeType = 'image/jpeg', baseUrl = GOOGLE, send = fetch }) {
   const body = JSON.stringify({
     contents: [
       { role: 'user', parts: [{ inlineData: { mimeType, data: base64 } }, { text: PROMPT }] },
@@ -98,7 +100,7 @@ export async function readCard({ apiKey, base64, mimeType = 'image/jpeg', baseUr
   for (let i = 0; i < MODELS.length; i++) {
     if (i > 0) await new Promise((r) => setTimeout(r, 1500 * i));
     const url = `${baseUrl.replace(/\/$/, '')}/models/${MODELS[i]}:generateContent`;
-    res = await fetch(url, {
+    res = await send(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body,

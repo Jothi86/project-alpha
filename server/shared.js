@@ -99,3 +99,11 @@ export async function tgSendFile(token, chatId, filename, text, type) {
   const data = await res.json().catch(() => ({}));
   if (!data.ok) throw new Error(data.description || 'Telegram sendDocument failed');
 }
+
+// Gemini call made from a fixed US location through the card-reader-relay
+// Durable Object (relay/). Falls back to a direct call without the binding.
+export function geminiSend(env) {
+  if (!env.RELAY) return fetch;
+  const stub = env.RELAY.get(env.RELAY.idFromName('us-west'), { locationHint: 'wnam' });
+  return (url, init) => stub.fetch('https://relay/', { method: 'POST', body: JSON.stringify({ url, init }) });
+}

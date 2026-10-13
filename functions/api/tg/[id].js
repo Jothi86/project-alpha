@@ -5,7 +5,7 @@
 import {
   readCard, describe, toVcard, isOtherSide, mergeCards,
 } from '../../../public/play/name-card-scanner/cardread.js';
-import { tg, tgSendFile, decrypt, toBase64, underLimit, countUse, DAILY_LIMIT } from '../../../server/shared.js';
+import { tg, tgSendFile, decrypt, toBase64, underLimit, countUse, geminiSend, DAILY_LIMIT } from '../../../server/shared.js';
 import { disconnect } from './connect.js';
 
 const HELP =
@@ -71,6 +71,7 @@ async function handle(env, id, bot, message) {
     const cards = await readCard({
       apiKey: env.GEMINI_API_KEY,
       baseUrl: env.GEMINI_BASE_URL || undefined,
+      send: geminiSend(env),
       base64: toBase64(await res.arrayBuffer()),
       mimeType: image.mimeType,
     });

@@ -2,7 +2,7 @@
 // -> { cards: [...] }. Nothing is stored; the image only passes through.
 
 import { readCard } from '../../public/play/name-card-scanner/cardread.js';
-import { json, underLimit, countUse, isOwner, DAILY_LIMIT } from '../../server/shared.js';
+import { json, underLimit, countUse, isOwner, geminiSend, DAILY_LIMIT } from '../../server/shared.js';
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const TYPES = /^image\/(jpeg|png|webp|heic|heif)$/;
@@ -30,7 +30,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   try {
-    const cards = await readCard({ apiKey: env.GEMINI_API_KEY, baseUrl: env.GEMINI_BASE_URL || undefined, base64: image, mimeType });
+    const cards = await readCard({ apiKey: env.GEMINI_API_KEY, baseUrl: env.GEMINI_BASE_URL || undefined, send: geminiSend(env), base64: image, mimeType });
     if (!owner) await countUse(env.CARDS_KV, `ip:${ip}`);
     return json({ cards });
   } catch (err) {
