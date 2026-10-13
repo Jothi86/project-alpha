@@ -1,0 +1,69 @@
+name: Set up AI Gateway for the card reader
+
+# One-off setup, safe to re-run: creates the Cloudflare AI Gateway the
+# Name Card Scanner calls Gemini through, points the Pages project at it
+# (GEMINI_BASE_URL), then redeploys so the setting takes effect.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/setup-ai-gateway.yml']
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GATEWAY: card-reader
+      PROJECT: project-alpha
+    steps:
+      - name: Create the gateway (or find it)
+        id: gw
+        run: |
+          api=https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/ai-gateway/gateways
+          code=$(curl -s -o get.json -w '%{http_code}' -H "Authorization: Bearer $CF_TOKEN" "$api/$GATEWAY")
+          echo "lookup: HTTP $code"
+          if [ "$code" != 200 ]; then
+            code=$(curl -s -o create.json -w '%{http_code}' -X POST "$api" \
+              -H "Authorization: Bearer $CF_TOKEN" -H 'Content-Type: application/json' \
+              -d "{\"id\":\"$GATEWAY\",\"cache_invalidate_on_update\":true,\"cache_ttl\":0,\"collect_logs\":true,\"rate_limiting_interval\":0,\"rate_limiting_limit\":0}")
+            echo "create: HTTP $code"; jq -c '{success, errors}' create.json || true
+          fi
+          if [ "$code" = 200 ]; then echo "id=$GATEWAY" >> "$GITHUB_OUTPUT"
+          else echo "Token cannot manage AI Gateway; falling back to the auto-created 'default' gateway."; echo "id=default" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Check the gateway reaches Gemini
+        run: |
+          url="https://gateway.ai.cloudflare.com/v1/$CF_ACCOUNT/${{ steps.gw.outputs.id }}/google-ai-studio/v1beta/models"
+          code=$(curl -s -o probe.json -w '%{http_code}' -H "cf-aig-authorization: Bearer $CF_TOKEN" "$url")
+          echo "probe: HTTP $code"; jq -c '.error // .' probe.json | head -c 400; echo
+          # No API key is sent, so Google answering 400/401/403 about the key means the route works.
+          if grep -qi 'location is not supported' probe.json; then echo "::error::Gateway region still blocked"; exit 1; fi
+          if [ "$code" = 404 ] || grep -qi 'gateway not found\|"code":2001' probe.json; then echo "::error::Gateway not reachable"; exit 1; fi
+
+      - name: Point the Pages project at the gateway
+        run: |
+          value="https://gateway.ai.cloudflare.com/v1/$CF_ACCOUNT/${{ steps.gw.outputs.id }}/google-ai-studio/v1beta"
+          body=$(jq -n --arg v "$value" '{deployment_configs:{production:{env_vars:{GEMINI_BASE_URL:{type:"plain_text",value:$v}}},preview:{env_vars:{GEMINI_BASE_URL:{type:"plain_text",value:$v}}}}}')
+          code=$(curl -s -o patch.json -w '%{http_code}' -X PATCH \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/projects/$PROJECT" \
+            -H "Authorization: Bearer $CF_TOKEN" -H 'Content-Type: application/json' -d "$body")
+          echo "set variable: HTTP $code"; jq -c '{success, errors}' patch.json
+          [ "$code" = 200 ]
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Redeploy so the new setting is live
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=project-alpha
