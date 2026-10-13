@@ -5,7 +5,7 @@
 import {
   readCard, describe, toVcard, isOtherSide, mergeCards,
 } from '../../../public/play/name-card-scanner/cardread.js';
-import { tg, tgSendFile, decrypt, toBase64, underLimit, DAILY_LIMIT } from '../../../server/shared.js';
+import { tg, tgSendFile, decrypt, toBase64, underLimit, countUse, DAILY_LIMIT } from '../../../server/shared.js';
 import { disconnect } from './connect.js';
 
 const HELP =
@@ -74,6 +74,7 @@ async function handle(env, id, bot, message) {
       base64: toBase64(await res.arrayBuffer()),
       mimeType: image.mimeType,
     });
+    await countUse(env.CARDS_KV, `bot:${id}`);
     if (!cards.length) {
       return say('I could not find a name card in that photo. Try again with the card filling the frame.');
     }

@@ -2,7 +2,7 @@
 // -> { cards: [...] }. Nothing is stored; the image only passes through.
 
 import { readCard } from '../../public/play/name-card-scanner/cardread.js';
-import { json, underLimit, DAILY_LIMIT } from '../../server/shared.js';
+import { json, underLimit, countUse, isOwner, DAILY_LIMIT } from '../../server/shared.js';
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const TYPES = /^image\/(jpeg|png|webp|heic|heif)$/;
@@ -24,12 +24,14 @@ export async function onRequestPost({ request, env }) {
   }
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  if (!(await underLimit(env.CARDS_KV, `ip:${ip}`))) {
+  const owner = await isOwner(request.headers.get('X-Owner-Key'));
+  if (!owner && !(await underLimit(env.CARDS_KV, `ip:${ip}`))) {
     return json({ error: `Daily limit reached (${DAILY_LIMIT} cards a day). Try again tomorrow.` }, 429);
   }
 
   try {
     const cards = await readCard({ apiKey: env.GEMINI_API_KEY, baseUrl: env.GEMINI_BASE_URL || undefined, base64: image, mimeType });
+    if (!owner) await countUse(env.CARDS_KV, `ip:${ip}`);
     return json({ cards });
   } catch (err) {
     return json({ error: `Could not read the card: ${err.message}` }, 502);

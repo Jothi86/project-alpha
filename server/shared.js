@@ -4,7 +4,18 @@
 //   GEMINI_API_KEY  secret: reads the cards
 //   TOKEN_KEY       secret: base64 32-byte AES key that encrypts bot tokens
 
-export const DAILY_LIMIT = 20;
+export const DAILY_LIMIT = 50;
+
+// The site owner scans without a limit. The page sends the owner key (kept in
+// the owner's browser) as X-Owner-Key; only its SHA-256 lives here.
+const OWNER_KEY_HASH = 'ac93e531cd7c6a1b67dbdbea2bbe50cf8845f5c780fd0a09ac24573292b7826a';
+
+export async function isOwner(key) {
+  if (!key) return false;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
+  const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hex === OWNER_KEY_HASH;
+}
 
 export const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -14,13 +25,17 @@ export const json = (data, status = 200) =>
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-// Counts one use against `who` for today. Returns false once the limit is hit.
+// True while `who` has scans left today. Only successful reads are counted
+// (countUse), so a failed read never uses up the allowance.
 export async function underLimit(kv, who) {
+  const used = Number((await kv.get(`rl:${who}:${today()}`)) || 0);
+  return used < DAILY_LIMIT;
+}
+
+export async function countUse(kv, who) {
   const key = `rl:${who}:${today()}`;
   const used = Number((await kv.get(key)) || 0);
-  if (used >= DAILY_LIMIT) return false;
   await kv.put(key, String(used + 1), { expirationTtl: 60 * 60 * 48 });
-  return true;
 }
 
 export function toBase64(buffer) {

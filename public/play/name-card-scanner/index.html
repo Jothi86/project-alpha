@@ -287,6 +287,18 @@ const store = {
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
+// Owner link (?owner=KEY): remember the key on this device, then tidy the URL
+// so it is never shared by accident. It lifts the daily scan limit.
+{
+  const params = new URLSearchParams(location.search);
+  const key = params.get('owner');
+  if (key !== null) {
+    if (key) store.set('ncs.owner', key); else store.del('ncs.owner');
+    params.delete('owner');
+    history.replaceState(null, '', location.pathname + (params.size ? `?${params}` : '') + location.hash);
+  }
+}
+
 let mode = store.get('ncs.mode');          // 'google' | 'file' | null
 let email = store.get('ncs.email') || '';
 let token = null;                          // { value, until } — kept in memory only
@@ -508,7 +520,10 @@ async function handlePhoto(file) {
     const image = await shrink(file);
     const res = await fetch('/api/read-card', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(store.get('ncs.owner') ? { 'X-Owner-Key': store.get('ncs.owner') } : {}),
+      },
       body: JSON.stringify({ image, mimeType: 'image/jpeg' }),
     });
     const data = await res.json().catch(() => ({}));
