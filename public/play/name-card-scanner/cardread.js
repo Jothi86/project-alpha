@@ -76,7 +76,12 @@ const SCHEMA = {
 };
 
 // base64: the image without a data: prefix. Returns an array of cards.
-export async function readCard({ apiKey, base64, mimeType = 'image/jpeg' }) {
+// baseUrl: where Gemini is reached. Google blocks calls from some Cloudflare
+// edge locations ("User location is not supported"), so production routes
+// through Cloudflare AI Gateway (env GEMINI_BASE_URL), which calls Google
+// from a supported region.
+const GOOGLE = 'https://generativelanguage.googleapis.com/v1beta';
+export async function readCard({ apiKey, base64, mimeType = 'image/jpeg', baseUrl = GOOGLE }) {
   const body = JSON.stringify({
     contents: [
       { role: 'user', parts: [{ inlineData: { mimeType, data: base64 } }, { text: PROMPT }] },
@@ -92,7 +97,7 @@ export async function readCard({ apiKey, base64, mimeType = 'image/jpeg' }) {
   let data;
   for (let i = 0; i < MODELS.length; i++) {
     if (i > 0) await new Promise((r) => setTimeout(r, 1500 * i));
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS[i]}:generateContent`;
+    const url = `${baseUrl.replace(/\/$/, '')}/models/${MODELS[i]}:generateContent`;
     res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -102,7 +107,11 @@ export async function readCard({ apiKey, base64, mimeType = 'image/jpeg' }) {
     if (res.ok || !RETRY_STATUS.has(res.status)) break;
   }
   if (!res.ok) {
-    throw new Error(`card reader failed: ${data.error?.message || res.status}`);
+    const msg = data.error?.message || String(res.status);
+    if (/location is not supported/i.test(msg)) {
+      throw new Error('the card reader is not reachable from this server region right now. Please try again in a minute.');
+    }
+    throw new Error(`card reader failed: ${msg}`);
   }
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
   let parsed;

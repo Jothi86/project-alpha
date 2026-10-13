@@ -1,8 +1,15 @@
 # Cloudflare Pages config. Bindings for the functions in functions/ live here;
 # secrets (GEMINI_API_KEY, TOKEN_KEY) are set with `wrangler pages secret put`.
+# GEMINI_BASE_URL (optional, set in the dashboard): the Cloudflare AI Gateway URL,
+# https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/google-ai-studio/v1beta
+# — Google rejects Gemini calls from some edge locations without it.
 name = "project-alpha"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-09-01"
+
+# Run functions near their backends (Gemini) rather than near each visitor.
+[placement]
+mode = "smart"
 
 # Name Card Scanner: daily counters and connected Telegram bots.
 [[kv_namespaces]]

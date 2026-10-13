@@ -70,6 +70,7 @@ async function handle(env, id, bot, message) {
     if (!res.ok) throw new Error('could not download the photo');
     const cards = await readCard({
       apiKey: env.GEMINI_API_KEY,
+      baseUrl: env.GEMINI_BASE_URL || undefined,
       base64: toBase64(await res.arrayBuffer()),
       mimeType: image.mimeType,
     });

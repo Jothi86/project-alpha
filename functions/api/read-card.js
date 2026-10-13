@@ -29,7 +29,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   try {
-    const cards = await readCard({ apiKey: env.GEMINI_API_KEY, base64: image, mimeType });
+    const cards = await readCard({ apiKey: env.GEMINI_API_KEY, baseUrl: env.GEMINI_BASE_URL || undefined, base64: image, mimeType });
     return json({ cards });
   } catch (err) {
     return json({ error: `Could not read the card: ${err.message}` }, 502);
