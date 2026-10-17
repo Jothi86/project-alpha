@@ -124,7 +124,18 @@
   #pdr { background: linear-gradient(90deg, #2f8fff, var(--cyan)); }
   #pdr.full { background: linear-gradient(90deg, #ffb347, #fff07a); animation: pulse .5s infinite alternate; }
   @keyframes pulse { to { filter: brightness(1.5); } }
-  .acts { left: calc(12px + var(--sl)); bottom: calc(12px + var(--sb)); display: grid; grid-template-columns: repeat(2, 62px); gap: 10px; pointer-events: auto; }
+  .acts { left: calc(12px + var(--sl)); bottom: calc(12px + var(--sb)); display: grid; grid-template-columns: repeat(3, 62px); gap: 10px; pointer-events: auto; }
+  .act kbd { position: absolute; top: -6px; right: -6px; }
+  .act.sel { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(255,138,61,.35); }
+  kbd { display: inline-block; min-width: 18px; padding: 1px 5px; border-radius: 5px; background: #0d1a2a; border: 1px solid rgba(160,220,255,.45);
+    border-bottom-width: 2px; font: 700 10px/1.4 'Chakra Petch', sans-serif; color: var(--ink); text-align: center; }
+  #keys { right: calc(12px + var(--sr)); top: calc(56px + var(--st)); display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 10px;
+    background: rgba(4,8,16,.55); border: 1px solid var(--line); font-size: 11px; color: #cfe3f2; }
+  #keys b { color: var(--orange); letter-spacing: 1px; font-size: 10px; }
+  #keys kbd { margin-right: 2px; }
+  #keys.hide { display: none; }
+  #wsel { position: absolute; left: calc(12px + var(--sl)); bottom: calc(160px + var(--sb)); font-size: 12px; letter-spacing: 1px; color: var(--orange); text-shadow: 0 1px 2px #000; }
+  @media (pointer: coarse) { kbd, #keys, .keyhint { display: none !important; } }
   .act { width: 62px; height: 62px; border-radius: 50%; border: 2px solid rgba(160,220,255,.35); background: rgba(10,20,34,.65);
     font-size: 10px; letter-spacing: 1px; position: relative; display: grid; place-items: center; touch-action: none;
     --cd: 0; background-image: conic-gradient(rgba(0,0,0,.65) calc(var(--cd) * 1turn), transparent 0); }
@@ -167,6 +178,7 @@
       <button id="btnNew" class="btn">NEW GAME</button>
       <button id="btnDexT" class="btn">K41JU-DEX</button>
     </div>
+    <p class="tag keyhint">Keyboard: <kbd>WASD</kbd> move &middot; arrows or mouse aim &middot; <kbd>ENTER</kbd> fire &middot; <kbd>1</kbd>-<kbd>4</kbd> weapons &middot; <kbd>Q</kbd> previous</p>
     <div id="kitMount"></div>
     <p class="fan">A free fan tribute. Not affiliated with any film studio. All art and music are original.</p>
   </section>
@@ -226,13 +238,23 @@
       <div class="lab"><span>DR1FT</span><span id="pdrT"></span></div><div class="hb"><i id="pdr"></i></div>
     </div>
     <div class="acts">
-      <button class="act" id="aFist"><span><b>&#9994;</b>FIST</span></button>
-      <button class="act" id="aBlade"><span><b>&#9876;</b>BLADE</span></button>
-      <button class="act" id="aKit"><span><b>+</b>KIT <i id="kitN"></i></span></button>
-      <button class="act" id="aOd"><span><b>&#9889;</b>DRIVE</span></button>
+      <button class="act" id="aPlasma" data-slot="0"><span><b>&#9678;</b>PLASMA</span><kbd>1</kbd></button>
+      <button class="act" id="aFist" data-slot="1"><span><b>&#9994;</b>FIST</span><kbd>2</kbd></button>
+      <button class="act" id="aBlade" data-slot="2"><span><b>&#9876;</b>BLADE</span><kbd>3</kbd></button>
+      <button class="act" id="aOd" data-slot="3"><span><b>&#9889;</b>DRIVE</span><kbd>4</kbd></button>
+      <button class="act" id="aKit"><span><b>+</b>KIT <i id="kitN"></i></span><kbd>R</kbd></button>
     </div>
+    <div id="keys"><b>KEYBOARD</b>
+      <span><kbd>A</kbd><kbd>D</kbd> dodge left / right</span>
+      <span><kbd>W</kbd><kbd>S</kbd> step in / back</span>
+      <span><kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> or mouse: aim</span>
+      <span><kbd>ENTER</kbd> fire (hold to charge)</span>
+      <span><kbd>1</kbd>-<kbd>4</kbd> pick weapon &middot; <kbd>Q</kbd> previous</span>
+      <span><kbd>R</kbd> repair &middot; <kbd>ESC</kbd> pause &middot; <kbd>H</kbd> hide</span>
+    </div>
+    <div id="wsel"></div>
     <div id="swipeHint">&lsaquo; SWIPE &rsaquo;</div>
-    <div id="coach"><div class="tip l">Swipe this side left or right to <b>dodge</b></div><div class="tip r">Drag this side to <b>aim</b>. Lift to <b>fire</b>, hold longer to charge</div></div>
+    <div id="coach"><div class="tip l">Swipe this side left/right to <b>dodge</b>, up/down to <b>step in or back</b></div><div class="tip r">Drag this side to <b>aim</b>. Lift to <b>fire</b>, hold longer to charge</div></div>
   </div>
   <div id="toast"></div>
   <div id="sub"></div>

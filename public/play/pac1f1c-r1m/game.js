@@ -688,11 +688,12 @@
       sec, type, waves, wi: 0, xp: 0, sal: 0, kills: 0, hp: maxHp(), lane: 0, camX: 0, roll: 0, iframe: 0, lastDodge: -9,
       aim: { x: W * 0.5, y: H * 0.42 }, charging: false, charge: 0, cdShot: 0, cdFist: 0, cdBlade: 0, drift: 50, desync: 0, emp: 0,
       od: 0, odT: 0, proj: [], shock: [], parts: [], nums: [], beams: [], fists: [], slashT: 0, recoil: 0, fistOut: 0,
-      hitstop: 0, slow: 0, shake: 0, hurtT: 0, t: 0, phase: 'fight', phaseT: 0, K: null, said: {}, muzzle: { x: W * 0.8, y: H * 0.8 }, fistTip: { x: W * 0.2, y: H * 0.8 },
+      sel: slotOpen(G.sel || 0) ? G.sel || 0 : 0, stepCd: 0, hitstop: 0, slow: 0, shake: 0, hurtT: 0, t: 0, phase: 'fight', phaseT: 0, K: null, said: {}, muzzle: { x: W * 0.8, y: H * 0.8 }, fistTip: { x: W * 0.2, y: H * 0.8 },
     };
     mode = 'battle'; show('battle');
     music(type === 'boss' ? 'boss' : 'battle');
     spawnWave();
+    $('#keys').classList.toggle('hide', !!G.keysHidden);
     if (!G.tut) { $('#coach').classList.add('show'); B.coach = 8; }
     const bs = BOSS(sec);
     if (type === 'boss') sub(`${bs.name}. Category ${roman(bs.cat)}. This is it, Ranger.`, 'MARSHAL ST4CK', 3);
@@ -831,6 +832,37 @@
   function useKit() {
     if (!canAct() || G.kits <= 0 || B.hp >= maxHp()) return;
     G.kits--; B.hp = Math.min(maxHp(), B.hp + maxHp() * 0.4); sfx.heal(); toast('HULL REPAIRED', 0.8); save();
+  }
+
+  // ---- weapon slots (keyboard 1-4, Q = previous, ENTER fires the selected one) ----
+  const SLOTS = [['PLASMA CANNON', 1], ['ROCKET FIST', 3], ['CHAIN BLADE', 6], ['OVERDRIVE', 1]];
+  const slotOpen = (i) => G.lvl >= SLOTS[i][1];
+  function selectSlot(i) {
+    if (!B) return;
+    if (!slotOpen(i)) { toast(`${SLOTS[i][0]} UNLOCKS AT LV ${SLOTS[i][1]}`, 1); sfx.denied(); return; }
+    if (B.sel !== i) { B.sel = i; G.sel = i; sfx.ui(); }
+  }
+  function prevSlot() {
+    if (!B) return;
+    for (let k = 1; k <= 4; k++) { const i = (B.sel - k + 4) % 4; if (slotOpen(i)) return selectSlot(i); }
+  }
+  function fireDown() {
+    if (!B) return;
+    if (B.sel === 0) startCharge();
+    else if (B.sel === 1) useFist();
+    else if (B.sel === 2) useBlade();
+    else if (B.drift >= 100) useOd();
+    else { toast('DR1FT NOT FULL YET', 0.8); sfx.denied(); }
+  }
+  function fireUp() { if (B && B.sel === 0) release(); }
+  // W/S: step toward or away from the K41JU.
+  function step(dir) {
+    const K = B && B.K;
+    if (!canAct() || !K || K.hidden || B.stepCd > 0 || ['dying', 'charge', 'emerge', 'surface'].includes(K.st)) return;
+    const np = clamp(K.p + dir * 0.14, 0.38, 0.92);
+    if (np === K.p) return;
+    K.p = np; B.stepCd = 0.35; B.shake = Math.max(B.shake, 0.12); sfx.dodge();
+    toast(dir > 0 ? 'STEP IN' : 'STEP BACK', 0.4);
   }
 
   // ---- K41JU AI ----
@@ -1009,7 +1041,7 @@
     b.slow = Math.max(0, b.slow - rdt);
     const d = rdt * ts;
     b.t += d;
-    for (const k of ['iframe', 'cdShot', 'cdFist', 'cdBlade', 'emp', 'desync', 'shake', 'hurtT', 'slashT']) b[k] = Math.max(0, b[k] - d);
+    for (const k of ['iframe', 'cdShot', 'cdFist', 'cdBlade', 'emp', 'desync', 'shake', 'hurtT', 'slashT', 'stepCd']) b[k] = Math.max(0, b[k] - d);
     b.camX = lerp(b.camX, b.lane, Math.min(1, d * 12));
     b.roll = lerp(b.roll, 0, Math.min(1, d * 6));
     if (b.coach !== undefined) {
@@ -1017,6 +1049,11 @@
       if (b.coach <= 0 || (b.didDodge && b.didFire)) { $('#coach').classList.remove('show'); delete b.coach; G.tut = 1; save(); }
     }
     if (b.charging) b.charge = Math.min(1, b.charge + d / 0.75);
+    const ak = H * 1.1 * rdt;
+    if (keysHeld.ArrowLeft) b.aim.x = clamp(b.aim.x - ak, 8, W - 8);
+    if (keysHeld.ArrowRight) b.aim.x = clamp(b.aim.x + ak, 8, W - 8);
+    if (keysHeld.ArrowUp) b.aim.y = clamp(b.aim.y - ak, 8, H - 8);
+    if (keysHeld.ArrowDown) b.aim.y = clamp(b.aim.y + ak, 8, H - 8);
     if (b.od > 0) {
       b.od -= rdt; b.odT -= rdt;
       if (b.odT <= 0 && b.K && !b.K.hidden && b.K.st !== 'dying') {
@@ -1264,7 +1301,7 @@
   }
 
   const hudEls = {};
-  ['khp', 'php', 'phpT', 'pdr', 'pdrT', 'aFist', 'aBlade', 'aKit', 'aOd', 'kitN'].forEach((id) => (hudEls[id] = $('#' + id)));
+  ['khp', 'php', 'phpT', 'pdr', 'pdrT', 'aPlasma', 'aFist', 'aBlade', 'aKit', 'aOd', 'kitN', 'wsel'].forEach((id) => (hudEls[id] = $('#' + id)));
   function hud() {
     const b = B, K = b.K, e = hudEls;
     e.khp.style.width = K ? `${Math.max(0, K.hp / K.hpMax) * 100}%` : '0%';
@@ -1279,6 +1316,10 @@
     set(e.aKit, G.kits > 0, 0, 1, G.kits > 0 && b.hp < maxHp() * 0.6);
     set(e.aOd, b.drift >= 100, 0, 1, false, b.drift >= 100);
     e.kitN.textContent = G.kits;
+    set(e.aPlasma, true, b.cdShot, 0.1, true);
+    [e.aPlasma, e.aFist, e.aBlade, e.aOd].forEach((el, i) => el.classList.toggle('sel', b.sel === i));
+    const label = `[${b.sel + 1}] ${SLOTS[b.sel][0]}`;
+    if (e.wsel.textContent !== label) e.wsel.textContent = label;
   }
 
   // ================= menus =================
@@ -1348,10 +1389,9 @@
     const mouse = e.pointerType === 'mouse';
     if (mouse || e.clientX > W * 0.4) {
       if (mouse && e.button !== 0) return;
-      aimPtr = { id: e.pointerId, x: e.clientX, y: e.clientY };
-      if (mouse) { B.aim.x = e.clientX; B.aim.y = e.clientY; }
-      startCharge();
-    } else dodgePtr = { id: e.pointerId, x: e.clientX };
+      aimPtr = { id: e.pointerId, x: e.clientX, y: e.clientY, mouse };
+      if (mouse) { B.aim.x = e.clientX; B.aim.y = e.clientY; fireDown(); } else startCharge();
+    } else dodgePtr = { id: e.pointerId, x: e.clientX, y: e.clientY };
     try { cv.setPointerCapture(e.pointerId); } catch {}
   });
   cv.addEventListener('pointermove', (e) => {
@@ -1362,12 +1402,13 @@
       B.aim.y = clamp(B.aim.y + (e.clientY - aimPtr.y) * 1.35, 8, H - 8);
       aimPtr.x = e.clientX; aimPtr.y = e.clientY;
     } else if (dodgePtr && dodgePtr.id === e.pointerId) {
-      const dx = e.clientX - dodgePtr.x;
-      if (Math.abs(dx) > 26) { dodge(Math.sign(dx)); dodgePtr.x = e.clientX; }
+      const dx = e.clientX - dodgePtr.x, dy = e.clientY - dodgePtr.y;
+      if (Math.abs(dx) > 26 && Math.abs(dx) >= Math.abs(dy)) { dodge(Math.sign(dx)); dodgePtr.x = e.clientX; dodgePtr.y = e.clientY; }
+      else if (Math.abs(dy) > 34) { step(dy < 0 ? 1 : -1); dodgePtr.x = e.clientX; dodgePtr.y = e.clientY; }
     }
   });
   const endPtr = (e) => {
-    if (aimPtr && aimPtr.id === e.pointerId) { aimPtr = null; release(); }
+    if (aimPtr && aimPtr.id === e.pointerId) { const m = aimPtr.mouse; aimPtr = null; if (m) fireUp(); else release(); }
     if (dodgePtr && dodgePtr.id === e.pointerId) dodgePtr = null;
   };
   cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
@@ -1377,20 +1418,34 @@
     el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); audioInit(); el.classList.add('on'); fn(); });
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(ev, () => el.classList.remove('on'));
   };
-  btnAct('#aFist', useFist); btnAct('#aBlade', useBlade); btnAct('#aKit', useKit); btnAct('#aOd', useOd);
+  btnAct('#aPlasma', () => selectSlot(0));
+  btnAct('#aFist', () => { if (slotOpen(1)) B.sel = 1; useFist(); }); btnAct('#aBlade', () => { if (slotOpen(2)) B.sel = 2; useBlade(); });
+  btnAct('#aOd', () => { B.sel = 3; useOd(); }); btnAct('#aKit', useKit);
+  const keysHeld = {};
   addEventListener('keydown', (e) => {
     audioInit();
+    const k = e.code;
+    if (k.startsWith('Arrow') || k === 'Space') e.preventDefault();
+    keysHeld[k] = true;
     if (mode === 'battle') {
-      const k = e.code;
-      if (k === 'KeyA' || k === 'ArrowLeft') dodge(-1);
-      else if (k === 'KeyD' || k === 'ArrowRight') dodge(1);
-      else if (k === 'KeyQ' || k === 'Digit1') useFist();
-      else if (k === 'KeyE' || k === 'Digit2') useBlade();
-      else if (k === 'Space' || k === 'Digit3') { useOd(); e.preventDefault(); }
-      else if (k === 'KeyR' || k === 'Digit4') useKit();
+      if (e.repeat) return;
+      if (k === 'KeyA') dodge(-1);
+      else if (k === 'KeyD') dodge(1);
+      else if (k === 'KeyW') step(1);
+      else if (k === 'KeyS') step(-1);
+      else if (k === 'Enter' || k === 'NumpadEnter' || k === 'Space') fireDown();
+      else if (k.startsWith('Digit') && +k[5] >= 1 && +k[5] <= 4) selectSlot(+k[5] - 1);
+      else if (k === 'KeyQ') prevSlot();
+      else if (k === 'KeyR') useKit();
+      else if (k === 'KeyH') { G.keysHidden = !G.keysHidden; save(); $('#keys').classList.toggle('hide', !!G.keysHidden); }
       else if (k === 'Escape' || k === 'KeyP') pause();
-    } else if (mode === 'pause' && (e.code === 'Escape' || e.code === 'KeyP')) resume();
+    } else if (mode === 'pause' && (k === 'Escape' || k === 'KeyP')) resume();
   });
+  addEventListener('keyup', (e) => {
+    keysHeld[e.code] = false;
+    if (mode === 'battle' && (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space')) fireUp();
+  });
+  addEventListener('blur', () => { for (const k in keysHeld) keysHeld[k] = false; });
   document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'battle') pause(); });
   function pause() { if (mode !== 'battle') return; release(); mode = 'pause'; show('pause'); }
   function resume() { mode = 'battle'; show('battle'); last = performance.now(); }
