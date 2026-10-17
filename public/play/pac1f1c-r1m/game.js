@@ -75,13 +75,31 @@
     wave: 'Shockwave! Get to the green lane!', emp: 'EMP charging. Shoot the glow!', armor: 'Armour plate. Keep hitting it to crack it open!',
   };
 
+  MAKO.guard = "It's going for the target! Hit it hard to stagger it, or shoot the acid down.";
+  const PLACES = ['', 'PENANG BRIDGE', 'GEORGE TOWN', 'OIL RIG', 'TRENCH STATION', 'SEAL BEACON'];
+  const MISSIONS = (s) => [
+    ['patrol', 'PATROL', 'Three K41JU, one after another.'],
+    ['defend', `DEFEND ${PLACES[s]}`, `Three K41JU go after ${PLACES[s]}. Stagger them, or shoot their acid down before it lands.`],
+    ['escort', 'ESCORT THE FERRY', 'Keep the ferry afloat for 60 seconds. K41JU keep coming.'],
+    ['twin', 'TWIN STRIKE', 'Two K41JU at once. The one in front fights; the one behind spits.'],
+    ['boss', `BOSS: ${BOSS(s).name}`, `Category ${roman(BOSS(s).cat)}. ${s < 5 ? `Beat it to open ${SECTOR[s + 1]}.` : 'Seal TH3 BR34CH.'}`],
+  ];
+  // J4GRs: hp/dmg multipliers, charge time, gun mode, dodge window, colours, boss needed to unlock.
+  const MECHS = [
+    { id: 'gypsy', name: 'GYPSY R4NG3R', blurb: 'Balanced. Hold to charge one big plasma shot.', hp: 1, dmg: 1, charge: 0.75, mode: 'charge', dodge: 0.24, accent: '#4fe3ff', trim: '#d8582c', need: 0 },
+    { id: 'stryka', name: 'STRYKA EUR3KA', blurb: 'Fastest. Quick charge; a full charge fires a 4-bolt salvo. Longest dodge window.', hp: 0.85, dmg: 0.95, charge: 0.45, mode: 'salvo', dodge: 0.34, accent: '#7dff9a', trim: '#e8eef2', need: 1 },
+    { id: 'crimson', name: 'CR1MS0N TYPH00N', blurb: 'Three arms. Hold to fire non-stop. No charging.', hp: 0.95, dmg: 1, charge: 1, mode: 'auto', dodge: 0.24, accent: '#ff5a5a', trim: '#ffd23f', need: 2 },
+    { id: 'cherno', name: 'CH3RNO ALF4', blurb: 'Heavy. +60% hull, huge shots, slow charge, short dodge window.', hp: 1.6, dmg: 1.65, charge: 1.15, mode: 'charge', dodge: 0.17, accent: '#ffb347', trim: '#8a5a2b', need: 3 },
+  ];
+  const mech = () => MECHS.find((m) => m.id === G.mech && G.boss >= m.need) || MECHS[0];
+
   // ================= save =================
   const SAVE = 'pac1f1c-r1m-v2';
-  const fresh = () => ({ lvl: 1, xp: 0, salvage: 0, kits: 2, upg: { armor: 0, plasma: 0, fist: 0, blade: 0 }, boss: 0, dex: {}, sound: true, tut: 0 });
+  const fresh = () => ({ mech: 'gypsy', done: {}, best: 0, lvl: 1, xp: 0, salvage: 0, kits: 2, upg: { armor: 0, plasma: 0, fist: 0, blade: 0 }, boss: 0, dex: {}, sound: true, tut: 0 });
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(SAVE));
-      if (s) return Object.assign(fresh(), s);
+      if (s) { const g = Object.assign(fresh(), s); g.done = g.done || {}; return g; }
       const old = JSON.parse(localStorage.getItem('pac1f1c-r1m-save'));
       if (old) { const g = fresh(); for (const k of ['lvl', 'xp', 'salvage', 'kits', 'upg', 'boss', 'dex']) if (old[k] != null) g[k] = old[k]; return g; }
     } catch {}
@@ -91,7 +109,7 @@
   const hadSave = !!G;
   if (!G) G = fresh();
   const save = () => { try { localStorage.setItem(SAVE, JSON.stringify(G)); } catch {} };
-  const maxHp = () => Math.round((60 + 12 * G.lvl) * (1 + 0.12 * G.upg.armor));
+  const maxHp = () => Math.round((60 + 12 * G.lvl) * (1 + 0.12 * G.upg.armor) * mech().hp);
   const xpNeed = () => 10 + 12 * G.lvl;
   const atkMul = (w) => (1 + 0.12 * (G.lvl - 1)) * (1 + 0.15 * (G.upg[w] || 0));
 
@@ -661,7 +679,7 @@
   const vib = (p) => { try { navigator.vibrate?.(p); } catch {} };
 
   // ================= DOM helpers =================
-  const screens = ['title', 'map', 'hangar', 'dex', 'result', 'pause'];
+  const screens = ['title', 'map', 'missions', 'hangar', 'dex', 'result', 'pause'];
   let mode = 'title', prevMode = 'title';
   function show(id) {
     for (const s of screens) $('#' + s).classList.toggle('show', s === id);
@@ -679,30 +697,59 @@
   const baseYAt = (p) => { const hy = horizon(); return hy + (H * 0.9 - hy) * Math.pow(p, 1.3); };
   const sizeAt = (p) => H * (0.2 + 0.62 * p);
 
+  const rowPick = (sec) => weighted(TABLES[sec].map((row) => [row, row[3]]));
+  const one = (sec, bump = 0) => { const r = rowPick(sec); return { sp: byId(r[0]), lvl: irnd(r[1], r[2]) + bump }; };
+  const maxSec = () => clamp(G.boss + 1, 1, 5);
+  const endlessSec = (n) => 1 + (Math.floor((n - 1) / 5) % maxSec());
+  function endlessWave(n) {
+    const s = endlessSec(n), lvl = Math.max(1, Math.round(1 + n * 0.85));
+    if (n % 5 === 0) return [{ sp: BOSS(irnd(1, maxSec())), lvl: lvl + 2 }];
+    const w = [{ sp: byId(rowPick(s)[0]), lvl }];
+    if (n % 3 === 0) { w[0].lvl = Math.max(1, lvl - 1); w.push({ sp: byId(rowPick(s)[0]), lvl: Math.max(1, lvl - 1) }); }
+    return w;
+  }
+  let uidN = 0;
+  const front = () => B.Ks.filter((k) => !k.done).sort((a, b) => (a.st === 'dying') - (b.st === 'dying') || b.p - a.p)[0] || null;
+
   function startMission(sec, type) {
     audioInit();
-    const waves = type === 'boss'
-      ? [{ sp: BOSS(sec), lvl: BOSS_LVL[sec] }]
-      : [0, 1, 2].map((i) => { const r = weighted(TABLES[sec].map((row) => [row, row[3]])); return { sp: byId(r[0]), lvl: irnd(r[1], r[2]) + (i === 2 ? 1 : 0) }; });
+    let waves;
+    if (type === 'boss') waves = [[{ sp: BOSS(sec), lvl: BOSS_LVL[sec] }]];
+    else if (type === 'twin') waves = sec >= 2 ? [[one(sec), one(sec)], [one(sec), one(sec, 1)]] : [[one(sec), one(sec)]];
+    else if (type === 'endless') { sec = endlessSec(1); waves = [endlessWave(1)]; }
+    else if (type === 'escort') waves = [[one(sec)]];
+    else waves = [0, 1, 2].map((i) => [one(sec, i === 2 ? 1 : 0)]);
+    const M = mech();
     B = {
-      sec, type, waves, wi: 0, xp: 0, sal: 0, kills: 0, hp: maxHp(), lane: 0, camX: 0, roll: 0, iframe: 0, lastDodge: -9,
+      sec, type, waves, wi: 0, xp: 0, sal: 0, kills: 0, hp: maxHp(), lane: 0, camX: 0, roll: 0, iframe: 0, lastDodge: -9, M,
       aim: { x: W * 0.5, y: H * 0.42 }, charging: false, charge: 0, cdShot: 0, cdFist: 0, cdBlade: 0, drift: 50, desync: 0, emp: 0,
-      od: 0, odT: 0, proj: [], shock: [], parts: [], nums: [], beams: [], fists: [], slashT: 0, recoil: 0, fistOut: 0,
-      sel: slotOpen(G.sel || 0) ? G.sel || 0 : 0, stepCd: 0, hitstop: 0, slow: 0, shake: 0, hurtT: 0, t: 0, phase: 'fight', phaseT: 0, K: null, said: {}, muzzle: { x: W * 0.8, y: H * 0.8 }, fistTip: { x: W * 0.2, y: H * 0.8 },
+      od: 0, odT: 0, proj: [], shock: [], parts: [], nums: [], beams: [], fists: [], gshots: [], slashT: 0, recoil: 0, fistOut: 0,
+      sel: slotOpen(G.sel || 0) ? G.sel || 0 : 0, stepCd: 0, hitstop: 0, slow: 0, shake: 0, hurtT: 0, t: 0, phase: 'fight', phaseT: 0, K: null, Ks: [], said: {}, muzzle: { x: W * 0.8, y: H * 0.8 }, fistTip: { x: W * 0.2, y: H * 0.8 },
+      endless: type === 'endless',
+      guard: type === 'defend' ? { name: PLACES[sec], hp: 100, max: 100, flash: 0 } : type === 'escort' ? { name: 'FERRY', hp: 100, max: 100, flash: 0, ferry: true } : null,
+      escort: type === 'escort' ? { t: 0, dur: 60 } : null,
     };
     mode = 'battle'; show('battle');
-    music(type === 'boss' ? 'boss' : 'battle');
+    music(type === 'boss' || type === 'endless' ? 'boss' : 'battle');
     spawnWave();
     $('#keys').classList.toggle('hide', !!G.keysHidden);
+    $('#guard').style.display = B.guard ? '' : 'none';
     if (!G.tut) { $('#coach').classList.add('show'); B.coach = 8; }
     const bs = BOSS(sec);
-    if (type === 'boss') sub(`${bs.name}. Category ${roman(bs.cat)}. This is it, Ranger.`, 'MARSHAL ST4CK', 3);
-    else sub(`Patrolling ${SECTOR[sec]}. Three contacts inbound.`);
+    const lines = {
+      boss: [`${bs.name}. Category ${roman(bs.cat)}. This is it, Ranger.`, 'MARSHAL ST4CK'],
+      defend: [`Hold the line at ${PLACES[sec]}. Don't let them reach it.`, 'MARSHAL ST4CK'],
+      escort: ['Ferry is crossing. Keep it afloat for 60 seconds.', 'MARSHAL ST4CK'],
+      twin: ['Two signatures. The front one fights, the back one spits.', 'MAK0'],
+      endless: ["Endless waves. Let's see how long we last.", 'MAK0'],
+      patrol: [`Patrolling ${SECTOR[sec]}. Three contacts inbound.`, 'MAK0'],
+    }[type];
+    sub(lines[0], lines[1], 3);
   }
   function makeKaiju(sp, lvl) {
     const boss = !!sp.boss, hpMax = Math.round(sp.hp * (1 + 0.28 * (lvl - 1)) * (boss ? 1.6 : 1.25));
     return {
-      sp, lvl, boss, hp: hpMax, hpMax, atk: sp.atk * (1 + 0.12 * (lvl - 1)), x: rnd(-0.5, 0.5), p: 0.4, st: 'emerge', t: 1.3, t0: 1.3, rise: 0,
+      uid: ++uidN, off: 0, sp, lvl, boss, hp: hpMax, hpMax, atk: sp.atk * (1 + 0.12 * (lvl - 1)), x: rnd(-0.5, 0.5), p: 0.4, st: 'emerge', t: 1.3, t0: 1.3, rise: 0,
       target: 0, side: -1, cd: 0.6, empCd: 5, empHit: 0, enraged: false, dmgWin: 0, dmgWinT: 0,
       anim: { ...IDLE }, weak: geo(sp).weak.map((w) => ({ ...w, armorMax: hpMax * 0.12, armor: hpMax * 0.12, broken: false })),
       shapes: [], hidden: false, mouthAt: { x: W / 2, y: H * 0.4 },
@@ -710,13 +757,31 @@
   }
   function spawnWave() {
     const w = B.waves[B.wi];
-    B.K = makeKaiju(w.sp, w.lvl);
-    G.dex[w.sp.id] = Math.max(G.dex[w.sp.id] || 0, 1);
-    $('#kName').textContent = `${w.sp.name}  LV ${w.lvl}`;
-    $('#kCat').textContent = `CAT ${roman(w.sp.cat)}${w.sp.boss ? ' · BOSS' : ''}`;
-    $('#wave').textContent = B.waves.length > 1 ? `CONTACT ${B.wi + 1}/${B.waves.length}` : 'BOSS';
+    B.Ks = w.map((e, i) => {
+      const K = makeKaiju(e.sp, e.lvl);
+      if (w.length > 1) { K.off = i ? 0.9 : -0.9; K.x = K.off; K.p = i ? 0.34 : 0.44; }
+      G.dex[e.sp.id] = Math.max(G.dex[e.sp.id] || 0, 1);
+      return K;
+    });
+    B.K = front();
     sfx.roar(); sfx.splash(); B.shake = 0.4;
-    for (let i = 0; i < 40; i++) splashPart(laneX(B.K.x, B.K.p), baseYAt(B.K.p), sizeAt(B.K.p));
+    for (const K of B.Ks) for (let i = 0; i < 30; i++) splashPart(laneX(K.x, K.p), baseYAt(K.p), sizeAt(K.p));
+  }
+  function waveLabel() {
+    if (B.endless) return `WAVE ${B.wi + 1} · BEST ${G.best}`;
+    if (B.escort) return `FERRY ${Math.max(0, Math.ceil(B.escort.dur - B.escort.t))}s`;
+    if (B.type === 'boss') return 'BOSS';
+    return `${B.type === 'defend' ? 'WAVE' : 'CONTACT'} ${B.wi + 1}/${B.waves.length}`;
+  }
+  // Where the defended landmark or the ferry sits on screen.
+  function guardPos() {
+    const hy = horizon();
+    if (B.guard.ferry) return { x: lerp(W * 0.08, W * 0.92, B.escort.t / B.escort.dur) - B.camX * W * 0.05, y: hy + H * 0.03 };
+    return { x: W * 0.2 - B.camX * W * 0.05, y: hy + H * 0.005 };
+  }
+  function gshotPos(g) {
+    const k = clamp(g.t / g.dur, 0, 1), gp = guardPos();
+    return { x: lerp(g.x0, gp.x, k), y: lerp(g.y0, gp.y, k) - Math.sin(k * Math.PI) * H * 0.18, r: 10 - k * 4, k };
   }
 
   // ---- particles ----
@@ -733,17 +798,21 @@
     if (!canAct()) return;
     const nl = clamp(B.lane + dir, -1, 1);
     if (nl === B.lane) { B.shake = Math.max(B.shake, 0.08); return; }
-    B.lane = nl; B.iframe = 0.24; B.lastDodge = B.t; B.roll = dir; sfx.dodge(); vib(10);
+    B.lane = nl; B.iframe = B.M.dodge; B.lastDodge = B.t; B.roll = dir; sfx.dodge(); vib(10);
     B.didDodge = true;
   }
-  function startCharge() { if (!canAct()) return; B.charging = true; B.charge = 0; humStart(); }
+  function startCharge() { if (!canAct()) return; B.charging = true; B.charge = 0; if (B.M.mode !== 'auto') humStart(); }
   function release() {
     if (!B || !B.charging) return;
     B.charging = false; humStop();
     if (!canAct()) return;
     if (B.emp > 0) { toast('WEAPONS OFFLINE', 0.8, true); sfx.denied(); return; }
+    if (B.M.mode === 'auto') return;
     if (B.cdShot > 0) return;
-    firePlasma(B.charge, { ...B.aim }, (5 + 15 * Math.pow(B.charge, 1.2)) * atkMul('plasma'));
+    const dmg = (5 + 15 * Math.pow(B.charge, 1.2)) * atkMul('plasma') * B.M.dmg;
+    if (B.M.mode === 'salvo' && B.charge >= 1) {
+      for (let i = 0; i < 4; i++) setTimeout(() => { if (B && B.phase === 'fight') firePlasma(0.6, { x: B.aim.x + rnd(-14, 14), y: B.aim.y + rnd(-14, 14) }, dmg * 0.42); }, i * 70);
+    } else firePlasma(B.charge, { ...B.aim }, dmg);
     B.didFire = true;
   }
   function firePlasma(c, at, dmg) {
@@ -759,20 +828,25 @@
         B.drift = Math.min(100, B.drift + 5); return;
       }
     }
+    for (const gs of B.gshots) {
+      const s = gshotPos(gs);
+      if (!gs.dead && Math.hypot(s.x - at.x, s.y - at.y) < s.r + 16) { gs.dead = true; boom(s.x, s.y, 30, '#c6ff3d'); toast('ACID SHOT DOWN', 0.6); B.drift = Math.min(100, B.drift + 5); return; }
+    }
     const h = hitAt(at.x, at.y);
     if (h) hitKaiju(h, dmg, full ? 'pierce' : 'plasma', at);
     else if (B.K && at.y > baseYAt(B.K.p) - 4) for (let i = 0; i < 6; i++) splashPart(at.x, at.y, 40);
   }
   function hitAt(x, y) {
-    const K = B.K;
-    if (!K || K.hidden || K.st === 'dying' || K.rise < 0.5) return null;
-    for (const s of K.shapes) if (s.t === 'weak' && Math.hypot(x - s.x, y - s.y) <= s.r * 1.3 + 4) return s;
-    for (const s of K.shapes) if (s.t !== 'weak') { const dx = (x - s.x) / s.rx, dy = (y - s.y) / s.ry; if (dx * dx + dy * dy <= 1) return s; }
+    const list = B.Ks.filter((K) => !K.hidden && K.st !== 'dying' && K.rise >= 0.5).sort((a, b) => b.p - a.p);
+    for (const K of list) {
+      for (const s of K.shapes) if (s.t === 'weak' && Math.hypot(x - s.x, y - s.y) <= s.r * 1.3 + 4) return { ...s, K };
+      for (const s of K.shapes) if (s.t !== 'weak') { const dx = (x - s.x) / s.rx, dy = (y - s.y) / s.ry; if (dx * dx + dy * dy <= 1) return { ...s, K }; }
+    }
     return null;
   }
   function hitKaiju(h, dmg, kind, at) {
-    const K = B.K;
-    if (!K || K.st === 'dying' || !h) return;
+    const K = h && h.K;
+    if (!K || K.st === 'dying') return;
     let mult = 1, crit = false;
     if (h.t === 'weak') {
       const w = K.weak[h.i];
@@ -822,7 +896,7 @@
       B.slow = 1.0; toast('FINISHER!', 1.4); B.sal += 5 + K.lvl; G.salvage += 5 + K.lvl;
       sparks(W / 2, H * 0.4, '#fff07a', 40); killKaiju(K); return;
     }
-    const h = hitAt(B.aim.x, B.aim.y) || K.shapes.find((s) => s.t === 'body');
+    const body = K.shapes.find((s) => s.t === 'body'), h = hitAt(B.aim.x, B.aim.y) || (body && { ...body, K });
     if (h) hitKaiju(h, 40 * atkMul('blade'), 'blade', h.t === 'weak' ? { ...B.aim } : { x: h.x, y: h.y });
   }
   function useOd() {
@@ -868,15 +942,19 @@
   // ---- K41JU AI ----
   function kThink(K) {
     const sf = (1 + 0.07 * K.sp.cat) * (K.enraged ? 1.3 : 1), ab = K.sp.abil || [], close = K.p > 0.72, opts = [];
-    opts.push(close ? ['swipe', 5] : ['approach', 3]);
+    const lead = K === B.K;
+    if (!lead && B.Ks.some((o) => o !== K && o.st.startsWith('wind'))) { K.cd = 0.5; return; }
+    if (lead) opts.push(close ? ['swipe', 5] : ['approach', 3]);
+    else opts.push(K.p > 0.5 ? ['retreat', 2] : ['approach', 1]);
     opts.push(['spit', close ? 1.5 : 3]);
+    if (B.guard) opts.push(['guard', lead ? 2.5 : 3]);
     if (ab.includes('volley')) opts.push(['volley', 2]);
-    if (ab.includes('charge') && K.p < 0.66) opts.push(['charge', 3]);
+    if (lead && ab.includes('charge') && K.p < 0.66) opts.push(['charge', 3]);
     if (ab.includes('dash')) opts.push(['dash', 2]);
-    if (ab.includes('dive')) opts.push(['dive', 1.3]);
+    if (lead && ab.includes('dive')) opts.push(['dive', 1.3]);
     if (ab.includes('emp') && K.empCd <= 0) opts.push(['emp', 3]);
     if (K.boss && K.enraged) opts.push(['wave', 2.5]);
-    if (close) opts.push(['retreat', 1]);
+    if (lead && close) opts.push(['retreat', 1]);
     const st = weighted(opts), tw = (s) => s / sf;
     const say = (k) => { if (!B.said[k]) { B.said[k] = 1; sub(MAKO[k]); } };
     switch (st) {
@@ -889,6 +967,7 @@
       case 'dash': K.st = 'dash'; K.t = 0.32; K.dashTo = clamp(K.x + (Math.random() < 0.5 ? -1 : 1) * rnd(0.8, 1.4), -1.2, 1.2); sfx.splash(); break;
       case 'dive': K.st = 'dive'; sfx.splash(); say('dive'); break;
       case 'emp': K.st = 'windEmp'; K.t = K.t0 = 1.8; K.empCd = 10; K.empHit = 0; sfx.empCharge(); toast('EMP CHARGING!', 1.2, true); say('emp'); break;
+      case 'guard': K.st = 'windGuard'; K.t = K.t0 = tw(1.6); toast(`IT'S GOING FOR THE ${B.guard.name}!`, 1.3, true); sfx.gurgle(); say('guard'); break;
       case 'wave': K.st = 'windWave'; K.t = K.t0 = tw(0.95); K.safe = irnd(-1, 1); sfx.roar(); say('wave'); break;
     }
   }
@@ -901,12 +980,13 @@
       for (const n of ['armL', 'armR', 'strL', 'strR', 'mouth', 'lean', 'emp']) a[n] = lerp(a[n], 0, k);
       a.jaw = lerp(a.jaw, 0.1 + 0.06 * Math.sin(B.t * 2), k);
     };
-    const track = (k) => { K.x += (B.lane * 0.85 - K.x) * k * d; };
+    const lead = K === B.K;
+    const track = (k) => { K.x += (clamp(B.lane * 0.85 + K.off * (lead ? 0.3 : 1), -1.3, 1.3) - K.x) * k * d; };
     const splashAt = () => splashPart(laneX(K.x, K.p), baseYAt(K.p), sizeAt(K.p));
     switch (K.st) {
       case 'emerge': K.rise = Math.min(1, K.rise + d / 1.1); a.jaw = lerp(a.jaw, 0.9, d * 4); if (K.t <= 0) { K.st = 'idle'; K.cd = 0.4; } break;
       case 'idle': relax(d * 6); track(1.1); K.x += Math.sin(B.t * 1.3) * 0.15 * d; K.cd -= d; if (K.cd <= 0) kThink(K); break;
-      case 'approach': relax(d * 6); track(1.4); K.p = Math.min(0.9, K.p + 0.4 * sf * d); if (K.t <= 0 || K.p >= 0.9) { K.st = 'idle'; K.cd = rnd(0.15, 0.45) / sf; } break;
+      case 'approach': relax(d * 6); track(1.4); K.p = Math.min(lead ? 0.9 : 0.5, K.p + 0.4 * sf * d); if (K.t <= 0 || K.p >= (lead ? 0.9 : 0.5)) { K.st = 'idle'; K.cd = rnd(0.15, 0.45) / sf; } break;
       case 'retreat': relax(d * 6); K.p = Math.max(0.38, K.p - 0.45 * d); if (K.t <= 0) { K.st = 'idle'; K.cd = rnd(0.3, 0.6) / sf; } break;
       case 'windSwipe': {
         const k = 1 - K.t / K.t0;
@@ -948,11 +1028,15 @@
         if (K.t <= 0) { a.strL = a.strR = 1; B.shock.push({ p0: K.p, t: 0, dur: 1.05, safe: K.safe, dmg: K.atk * 1.4 }); sfx.slam(); B.shake = 0.45; K.st = 'recover'; K.t = 0.7; }
         break;
       }
+      case 'windGuard':
+        a.jaw = lerp(a.jaw, 1, d * 4); a.mouth = Math.min(1, a.mouth + d / K.t0); a.lean = lerp(a.lean, -0.06, d * 3);
+        if (K.t <= 0) { B.gshots.push({ x0: K.mouthAt.x, y0: K.mouthAt.y, t: 0, dur: 0.75, dmg: 9 + 3 * K.sp.cat, col: geo(K.sp).glow }); sfx.spit(); K.st = 'recover'; K.t = 0.4; }
+        break;
       case 'stagger': a.lean = lerp(a.lean, 0.12, d * 6); a.jaw = lerp(a.jaw, 0.75, d * 5); if (K.t <= 0) { K.st = 'idle'; K.cd = 0.3; } break;
       case 'dying':
         K.rise = Math.max(0, K.rise - d / 1.8); a.jaw = lerp(a.jaw, 1, d * 3); a.lean = lerp(a.lean, 0.25, d);
         if (Math.random() < 0.35) { const s = K.shapes[Math.floor(Math.random() * K.shapes.length)]; if (s) boom(s.x + rnd(-20, 20), s.y + rnd(-20, 20), rnd(20, 50)); }
-        if (K.rise <= 0 && !K.done) { K.done = true; onKaijuGone(); }
+        if (K.rise <= 0 && !K.done) { K.done = true; onKaijuGone(K); }
         break;
     }
     K.x = clamp(K.x, -1.3, 1.3);
@@ -1002,29 +1086,56 @@
       if (lv === 6) setTimeout(() => sub('CHAIN BLADE is online. Use it up close, or to finish a staggered K41JU.', 'MAK0', 3.5), 3200);
     }
   }
-  function onKaijuGone() {
+  function onKaijuGone(K) {
+    B.Ks = B.Ks.filter((k) => k !== K);
+    B.K = front();
+    if (B.Ks.length || B.phase !== 'fight') return;
     B.wi++;
-    B.K = null;
-    if (B.wi < B.waves.length) { B.phase = 'between'; B.phaseT = 1.6; sub(`Next contact. ${B.wi + 1} of ${B.waves.length}.`); }
-    else endMission(true);
+    if (B.endless) {
+      B.waves.push(endlessWave(B.wi + 1)); B.sec = endlessSec(B.wi + 1);
+      B.hp = Math.min(maxHp(), B.hp + maxHp() * 0.2);
+    }
+    if (B.escort && B.wi >= B.waves.length) B.waves.push(Math.random() < 0.25 ? [one(B.sec), one(B.sec)] : [one(B.sec)]);
+    if (B.wi < B.waves.length) {
+      B.phase = 'between'; B.phaseT = B.escort ? 0.8 : 1.6;
+      sub(B.endless ? `Wave ${B.wi + 1}${(B.wi + 1) % 5 === 0 ? '. Boss signature!' : '.'} Hull patched 20%.` : B.escort ? 'Another one surfacing. Keep the ferry covered!' : `Next contact. ${B.wi + 1} of ${B.waves.length}.`);
+    } else endMission(true);
   }
   function endMission(win) {
     if (B.phase === 'over') return;
     B.phase = 'over'; B.charging = false; humStop();
+    const s = B, M = s.M;
     let extra = '';
-    if (win && B.type === 'boss' && G.boss < B.sec) {
-      G.boss = B.sec; G.kits++;
-      extra = B.sec < 5 ? `<p>The buoy line to <b>${SECTOR[B.sec + 1]}</b> is down. +1 repair kit.</p>` : '<p><b>TH3 BR34CH collapses in on itself. The K41JU war is over.</b><br>Thanks for playing PAC1F1C R1M.</p>';
+    if (win && s.type !== 'endless') {
+      G.done[`${s.sec}:${s.type}`] = 1;
+      if (['defend', 'escort', 'twin'].includes(s.type)) {
+        const bonus = 10 + 5 * s.sec; s.sal += bonus; G.salvage += bonus;
+        extra += `<p>Mission bonus: +${bonus} salvage.</p>`;
+      }
     }
+    if (win && s.type === 'boss' && G.boss < s.sec) {
+      G.boss = s.sec; G.kits++;
+      extra += s.sec < 5 ? `<p>The buoy line to <b>${SECTOR[s.sec + 1]}</b> is down. +1 repair kit.</p>` : '<p><b>TH3 BR34CH collapses in on itself. The K41JU war is over.</b><br>Thanks for playing PAC1F1C R1M.</p>';
+      const nm = MECHS.find((m) => m.need === s.sec);
+      if (nm) extra += `<p><b style="color:${nm.accent}">${nm.name}</b> joins the program. Pick it in the HANGAR.</p>`;
+    }
+    let title;
+    if (s.endless) {
+      const waves = s.wi, best = waves > G.best;
+      G.best = Math.max(G.best, waves);
+      title = `SURVIVED ${waves} WAVE${waves === 1 ? '' : 'S'}`;
+      extra = `<p>${best ? 'New best!' : `Best: ${G.best} waves.`}</p>` + extra;
+    } else if (win) {
+      title = { boss: `${s.waves[0][0].sp.name} DEFEATED`, defend: `${PLACES[s.sec]} HOLDS`, escort: 'FERRY SAFE', twin: 'TWIN STRIKE CLEARED', patrol: 'SECTOR CLEAR' }[s.type];
+    } else title = s.guard && s.guard.hp <= 0 ? `${s.guard.name} LOST` : `${M.name} DOWN`;
     save();
     music(null);
     (win ? sfx.win : sfx.lose)();
-    const s = B;
     setTimeout(() => {
       if (mode !== 'battle' || B !== s) return;
-      $('#resTitle').textContent = win ? (s.type === 'boss' ? `${s.waves[0].sp.name} DEFEATED` : 'SECTOR CLEAR') : 'GYPSY R4NG3R DOWN';
-      $('#resTitle').className = win ? 'win' : 'lose';
-      $('#resBody').innerHTML = `<p>${s.kills} K41JU neutralized &middot; +${s.xp} XP &middot; +${s.sal} salvage</p><p>GYPSY R4NG3R is LV ${G.lvl}. ${win ? '' : 'MAK0 pulled you out. You keep what you earned.'}</p>${extra}`;
+      $('#resTitle').textContent = title;
+      $('#resTitle').className = win || s.endless ? 'win' : 'lose';
+      $('#resBody').innerHTML = `<p>${s.kills} K41JU neutralized &middot; +${s.xp} XP &middot; +${s.sal} salvage</p><p>Pilot LV ${G.lvl}. ${win || s.endless ? '' : 'MAK0 pulled you out. You keep what you earned.'}</p>${extra}`;
       mode = 'result'; show('result');
     }, win ? 1300 : 1600);
   }
@@ -1048,7 +1159,9 @@
       b.coach -= rdt;
       if (b.coach <= 0 || (b.didDodge && b.didFire)) { $('#coach').classList.remove('show'); delete b.coach; G.tut = 1; save(); }
     }
-    if (b.charging) b.charge = Math.min(1, b.charge + d / 0.75);
+    if (b.charging && b.M.mode === 'auto') {
+      if (b.cdShot <= 0 && b.emp <= 0 && canAct()) { firePlasma(0.25, { x: b.aim.x + rnd(-5, 5), y: b.aim.y + rnd(-5, 5) }, 4.2 * atkMul('plasma') * b.M.dmg); b.cdShot = 0.1; b.didFire = true; }
+    } else if (b.charging) b.charge = Math.min(1, b.charge + d / b.M.charge);
     const ak = H * 1.1 * rdt;
     if (keysHeld.ArrowLeft) b.aim.x = clamp(b.aim.x - ak, 8, W - 8);
     if (keysHeld.ArrowRight) b.aim.x = clamp(b.aim.x + ak, 8, W - 8);
@@ -1073,9 +1186,22 @@
     for (const p of b.parts) { p.life -= d; p.vy += (p.g || 0) * d; p.x += p.vx * d; p.y += p.vy * d; if (p.rot !== undefined) p.rot += p.vr * d; }
     b.parts = b.parts.filter((p) => p.life > 0);
 
+    if (b.escort && b.phase !== 'over') { b.escort.t += d; if (b.escort.t >= b.escort.dur) { toast('FERRY HAS LANDED', 1.4); endMission(true); } }
+    if (b.guard) b.guard.flash = Math.max(0, b.guard.flash - d);
     if (b.phase === 'between') { b.phaseT -= d; if (b.phaseT <= 0) { b.phase = 'fight'; spawnWave(); } return; }
-    if (b.K) kUpdate(b.K, d);
+    b.K = front();
+    for (const K of [...b.Ks]) kUpdate(K, d);
     if (b.phase !== 'fight') return;
+    for (const g of b.gshots) {
+      g.t += d;
+      if (g.t >= g.dur && !g.dead) {
+        g.dead = true; const gp = guardPos();
+        b.guard.hp = Math.max(0, b.guard.hp - g.dmg); b.guard.flash = 0.35; boom(gp.x, gp.y, 40, g.col); sfx.boom();
+        toast(`${b.guard.name} HIT! ${Math.round(b.guard.hp)}%`, 0.9, true);
+        if (b.guard.hp <= 0) { endMission(false); return; }
+      }
+    }
+    b.gshots = b.gshots.filter((g) => !g.dead);
     for (const p of b.proj) {
       p.t += d;
       if (p.t >= p.dur && !p.dead) {
@@ -1093,13 +1219,13 @@
   }
 
   // ---- battle drawing ----
-  function drawLaneMarks(K) {
+  function drawLaneMarks(K, all) {
     if (!K) return;
     const marks = [];
     if (['windSwipe', 'swipe', 'surface', 'windCharge', 'charge'].includes(K.st)) marks.push([K.target, '#ff4d5e', 0.5]);
     if (K.st === 'windWave') for (const l of [-1, 0, 1]) marks.push([l, l === K.safe ? '#5dffa8' : '#ff4d5e', 0.45]);
-    for (const w of B.shock) for (const l of [-1, 0, 1]) marks.push([l, l === w.safe ? '#5dffa8' : '#ff4d5e', 0.35]);
-    for (const p of B.proj) if (p.t > 0) marks.push([p.L, '#ffd23f', 0.22]);
+    if (all) for (const w of B.shock) for (const l of [-1, 0, 1]) marks.push([l, l === w.safe ? '#5dffa8' : '#ff4d5e', 0.35]);
+    if (all) for (const p of B.proj) if (p.t > 0) marks.push([p.L, '#ffd23f', 0.22]);
     const pulse = 0.6 + 0.4 * Math.sin(B.t * 18);
     for (const [l, col, al] of marks) {
       const p0 = K.hidden ? 0.8 : K.p, y0 = baseYAt(p0), y1 = H;
@@ -1108,6 +1234,38 @@
       g.addColorStop(0, rgba(col, 0)); g.addColorStop(1, rgba(col, al * pulse));
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.moveTo(x0 - w0, y0); ctx.lineTo(x0 + w0, y0); ctx.lineTo(x1 + w1, y1); ctx.lineTo(x1 - w1, y1); ctx.fill();
+    }
+  }
+  function drawGuard() {
+    const g = B.guard, { x, y } = guardPos(), k = H / 420, fl = g.flash > 0 && Math.floor(B.t * 20) % 2;
+    ctx.save(); ctx.translate(x, y);
+    if (g.ferry) {
+      ctx.strokeStyle = 'rgba(220,240,255,.5)'; ctx.lineWidth = 1.5;
+      for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(-14 * k * i, 3 * k); ctx.lineTo(-14 * k * i - 16 * k, 3 * k + i * 2 * k); ctx.stroke(); }
+      ctx.fillStyle = fl ? '#fff' : '#e9eef3'; ctx.beginPath(); ctx.moveTo(-26 * k, -4 * k); ctx.lineTo(28 * k, -4 * k); ctx.lineTo(20 * k, 5 * k); ctx.lineTo(-22 * k, 5 * k); ctx.fill();
+      ctx.fillStyle = '#c0392b'; ctx.fillRect(-24 * k, 1 * k, 46 * k, 2 * k);
+      ctx.fillStyle = fl ? '#fff' : '#dfe6ec'; ctx.fillRect(-12 * k, -12 * k, 22 * k, 8 * k);
+      ctx.fillStyle = '#35506a'; for (let i = 0; i < 4; i++) ctx.fillRect(-10 * k + i * 5 * k, -10 * k, 3 * k, 3 * k);
+    } else {
+      ctx.fillStyle = fl ? '#ffffff' : '#141c28';
+      ctx.fillRect(-22 * k, -8 * k, 44 * k, 8 * k); ctx.fillRect(-6 * k, -58 * k, 12 * k, 50 * k); ctx.fillRect(-16 * k, -40 * k, 32 * k, 5 * k);
+      ctx.beginPath(); ctx.moveTo(-6 * k, -58 * k); ctx.lineTo(0, -74 * k); ctx.lineTo(6 * k, -58 * k); ctx.fill();
+      ctx.fillStyle = Math.sin(B.t * 4) > 0 ? '#ff4d5e' : '#5a1018'; ctx.beginPath(); ctx.arc(0, -75 * k, 2.5 * k, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(255,214,140,.85)'; for (let i = 0; i < 5; i++) ctx.fillRect(-3 * k, -52 * k + i * 9 * k, 2 * k, 2 * k);
+    }
+    const bw = 44 * k, top = g.ferry ? -22 * k : -88 * k;
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(-bw / 2, top, bw, 4 * k);
+    ctx.fillStyle = g.hp > 40 ? '#5dffa8' : '#ff4d5e'; ctx.fillRect(-bw / 2, top, bw * g.hp / g.max, 4 * k);
+    ctx.restore();
+  }
+  function drawGShots() {
+    for (const gs of B.gshots) {
+      const s = gshotPos(gs);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 2.5);
+      g.addColorStop(0, rgba(gs.col, 0.95)); g.addColorStop(1, rgba(gs.col, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 2.5, 0, TAU); ctx.fill(); ctx.restore();
+      ctx.fillStyle = mix(gs.col, '#ffffff', 0.5); ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 0.7, 0, TAU); ctx.fill();
     }
   }
   function drawShock() {
@@ -1165,7 +1323,7 @@
     ctx.beginPath(); ctx.rect(x - s * 0.8, y - s * 0.7, s * 1.6, s * 1.4); ctx.fill();
     ctx.strokeStyle = '#0b1018'; ctx.lineWidth = Math.max(1, s * 0.08);
     for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x - s * 0.8 + (i + 1) * s * 0.4, y - s * 0.7); ctx.lineTo(x - s * 0.8 + (i + 1) * s * 0.4, y - s * 0.2); ctx.stroke(); }
-    ctx.fillStyle = '#d8582c'; ctx.fillRect(x - s * 0.8, y + s * 0.3, s * 1.6, s * 0.12);
+    ctx.fillStyle = B && B.M ? B.M.trim : '#d8582c'; ctx.fillRect(x - s * 0.8, y + s * 0.3, s * 1.6, s * 0.12);
   }
   function drawBeams() {
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
@@ -1200,17 +1358,23 @@
       ctx.beginPath(); ctx.moveTo(-70, 40); ctx.lineTo(-52, -170); ctx.lineTo(52, -170); ctx.lineTo(74, 40); ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 2;
       for (const y of [-60, -120]) { ctx.beginPath(); ctx.moveTo(-62, y); ctx.lineTo(62, y); ctx.stroke(); }
-      ctx.fillStyle = '#d8582c'; ctx.fillRect(-58, -40, 18, 60);
-      ctx.fillStyle = `rgba(79,227,255,${0.35 + ch * 0.65})`; ctx.fillRect(30, -150, 6, 140);
+      ctx.fillStyle = b.M.trim; ctx.fillRect(-58, -40, 18, 60);
+      ctx.fillStyle = rgba(b.M.accent, 0.35 + ch * 0.65); ctx.fillRect(30, -150, 6, 140);
       ctx.fillStyle = metal(-34, 0, 34, 0, true);
       ctx.fillRect(-32, -250, 64, 84);
       ctx.fillStyle = '#0d131b';
       for (let i = 0; i < 4; i++) ctx.fillRect(-34, -240 + i * 20, 68, 5);
       const g = ctx.createRadialGradient(0, -252, 0, 0, -252, 34 + ch * 40);
-      g.addColorStop(0, `rgba(255,255,255,${0.5 + ch * 0.5})`); g.addColorStop(0.3, `rgba(79,227,255,${0.4 + ch * 0.6})`); g.addColorStop(1, 'rgba(79,227,255,0)');
+      g.addColorStop(0, `rgba(255,255,255,${0.5 + ch * 0.5})`); g.addColorStop(0.3, rgba(b.M.accent, 0.4 + ch * 0.6)); g.addColorStop(1, rgba(b.M.accent, 0));
       ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -252, 34 + ch * 40, 0, TAU); ctx.fill();
       ctx.restore();
       b.muzzle = { x: ox + Math.sin(ang) * 252 * k, y: oy - Math.cos(ang) * 252 * k };
+      if (b.M.id === 'crimson') {
+        ctx.save(); ctx.translate(W * 0.8 + b.recoil * 8 * k, H * 1.08 + bob); ctx.rotate(ang * 0.8 - 0.1); ctx.scale(k * 0.7, k * 0.7);
+        ctx.fillStyle = metal(-40, 0, 40, 0, true); ctx.fillRect(-26, -230, 52, 230);
+        ctx.fillStyle = b.M.trim; ctx.fillRect(-26, -120, 52, 10);
+        ctx.restore();
+      }
     }
     {
       const px = W * 0.03, py = H * 1.12, slash = b.slashT > 0 ? 1 - b.slashT / 0.32 : 0;
@@ -1220,8 +1384,8 @@
       ctx.beginPath(); ctx.moveTo(-74, 40); ctx.lineTo(-52, -160); ctx.lineTo(52, -160); ctx.lineTo(70, 40); ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 2;
       for (const y of [-55, -110]) { ctx.beginPath(); ctx.moveTo(-60, y); ctx.lineTo(60, y); ctx.stroke(); }
-      ctx.fillStyle = '#d8582c'; ctx.fillRect(40, -40, 18, 60);
-      ctx.fillStyle = 'rgba(79,227,255,.45)'; ctx.fillRect(-36, -140, 6, 120);
+      ctx.fillStyle = b.M.trim; ctx.fillRect(40, -40, 18, 60);
+      ctx.fillStyle = rgba(b.M.accent, 0.45); ctx.fillRect(-36, -140, 6, 120);
       if (b.slashT > 0 && G.lvl >= 6) {
         const L = 300;
         for (let i = 0; i < 12; i++) { ctx.fillStyle = i % 2 ? '#c9d6e3' : '#7f8fa1'; ctx.beginPath(); ctx.moveTo(-14, -170 - i * L / 12); ctx.lineTo(14, -170 - i * L / 12); ctx.lineTo(10, -170 - (i + 1) * L / 12); ctx.lineTo(-10, -170 - (i + 1) * L / 12); ctx.fill(); }
@@ -1254,7 +1418,7 @@
     for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + (h ? B.t * 2 : 0); ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * (r + 4), y + Math.sin(a) * (r + 4)); ctx.lineTo(x + Math.cos(a) * (r + 11), y + Math.sin(a) * (r + 11)); ctx.stroke(); }
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 2, 0, TAU); ctx.fill();
     if (ch > 0) { ctx.strokeStyle = ch >= 1 ? '#fff07a' : '#4fe3ff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y, r + 7, -Math.PI / 2, -Math.PI / 2 + ch * TAU); ctx.stroke(); }
-    if (h && h.t === 'weak') { ctx.font = '700 11px "Chakra Petch"'; ctx.fillStyle = col; ctx.fillText(B.K.weak[h.i].broken ? 'WEAK POINT' : 'ARMOUR', x + r + 14, y - r); }
+    if (h && h.t === 'weak') { ctx.font = '700 11px "Chakra Petch"'; ctx.fillStyle = col; ctx.fillText(h.K.weak[h.i].broken ? 'WEAK POINT' : 'ARMOUR', x + r + 14, y - r); }
     ctx.restore();
   }
   function drawNums() {
@@ -1288,23 +1452,33 @@
     if (b.shake > 0) ctx.translate(rnd(-1, 1) * b.shake * 18, rnd(-1, 1) * b.shake * 12);
     if (Math.abs(b.roll) > 0.01) { ctx.translate(W / 2, H / 2); ctx.rotate(-b.roll * 0.035); ctx.translate(-W / 2, -H / 2); }
     drawScene(b.sec, b.t, b.camX, hy, rdt);
-    const K = b.K;
-    drawLaneMarks(K);
-    if (K && !K.hidden) {
+    if (b.guard) drawGuard();
+    for (const K of b.Ks) drawLaneMarks(K, K === b.K);
+    for (const K of [...b.Ks].sort((x, y) => x.p - y.p)) {
+      if (K.hidden) { K.shapes = []; continue; }
       const bob = K.st === 'approach' || K.st === 'charge' ? Math.abs(Math.sin(b.t * 6)) * sizeAt(K.p) * 0.01 : 0;
       K.shapes = drawKaiju(ctx, K, laneX(K.x, K.p), baseYAt(K.p) - bob, sizeAt(K.p), { t: b.t });
-    } else if (K) K.shapes = [];
-    drawShock(); drawProj(); drawParts(); drawBeams();
+    }
+    drawShock(); drawProj(); drawGShots(); drawParts(); drawBeams();
     drawWeather(b.sec, rdt);
     ctx.restore();
     drawArms(); drawReticle(); drawNums(); drawOverlays();
   }
 
   const hudEls = {};
-  ['khp', 'php', 'phpT', 'pdr', 'pdrT', 'aPlasma', 'aFist', 'aBlade', 'aKit', 'aOd', 'kitN', 'wsel'].forEach((id) => (hudEls[id] = $('#' + id)));
+  ['khp', 'php', 'phpT', 'pdr', 'pdrT', 'aPlasma', 'aFist', 'aBlade', 'aKit', 'aOd', 'kitN', 'wsel', 'kName', 'kCat', 'k2', 'wave', 'ghp', 'gName'].forEach((id) => (hudEls[id] = $('#' + id)));
   function hud() {
     const b = B, K = b.K, e = hudEls;
     e.khp.style.width = K ? `${Math.max(0, K.hp / K.hpMax) * 100}%` : '0%';
+    if (K && e.kName.dataset.uid !== String(K.uid)) {
+      e.kName.dataset.uid = K.uid; e.kName.textContent = `${K.sp.name}  LV ${K.lvl}`;
+      e.kCat.textContent = `CAT ${roman(K.sp.cat)}${K.boss ? ' · BOSS' : ''}`;
+    }
+    const other = b.Ks.find((o) => o !== K && o.st !== 'dying');
+    const k2 = other ? `+ ${other.sp.name} ${Math.round(other.hp / other.hpMax * 100)}%` : '';
+    if (e.k2.textContent !== k2) e.k2.textContent = k2;
+    const wl = waveLabel(); if (e.wave.textContent !== wl) e.wave.textContent = wl;
+    if (b.guard) { e.ghp.style.width = `${b.guard.hp}%`; if (e.gName.textContent !== b.guard.name) e.gName.textContent = b.guard.name; }
     e.php.style.width = `${b.hp / maxHp() * 100}%`; e.phpT.textContent = `${Math.ceil(b.hp)}/${maxHp()}`;
     e.pdr.style.width = `${b.drift}%`; e.pdr.classList.toggle('full', b.drift >= 100); e.pdrT.textContent = `${Math.round(b.drift)}%`;
     const set = (el, unlocked, cd, max, ready, glow) => {
@@ -1336,16 +1510,34 @@
         <div class="num">0${s}</div><h3>${SECTOR[s]}</h3><p>Rec. LV ${REC[s]}</p>
         <p class="bossn">${beat ? `<span class="done">&#10003; ${b.name} defeated</span>` : open ? `Boss: ${b.name}` : 'Boss: ???'}</p>
         <div class="grow"></div>
-        ${open ? `<button class="btn" data-go="patrol" data-s="${s}">PATROL &middot; 3 K41JU</button><button class="btn hot" data-go="boss" data-s="${s}">${beat ? 'REMATCH' : 'FIGHT ' + b.name}</button>`
+        ${open ? `<p class="muted">${['patrol', 'defend', 'escort', 'twin'].filter((t) => G.done[`${s}:${t}`]).length + (beat ? 1 : 0)}/5 missions done</p><button class="btn cy" data-sec="${s}">MISSIONS</button>`
           : `<p>Defeat ${BOSS(s - 1).name} to unlock</p>`}
       </div>`;
     }
     $('#sectors').innerHTML = html;
+    $('#mName').textContent = mech().name;
+    $('#btnEndless').textContent = `ENDLESS${G.best ? ` · BEST ${G.best}` : ''}`;
+  }
+  function openMissions(s) {
+    mode = 'missions'; show('missions');
+    $('#msTitle').textContent = `0${s} ${SECTOR[s]}`;
+    $('#msList').innerHTML = MISSIONS(s).map(([t, name, desc]) => {
+      const done = t === 'boss' ? G.boss >= s : G.done[`${s}:${t}`];
+      return `<div class="mrow"><div><b>${name}</b> ${done ? '<span class="done">&#10003;</span>' : ''}<p class="muted">${desc}</p></div>
+        <button class="btn ${t === 'boss' ? 'hot' : 'cy'}" data-go="${t}" data-s="${s}">PLAY</button></div>`;
+    }).join('');
   }
   const UPG = [['armor', 'ARMOUR', 'More hull'], ['plasma', 'PLASMA', 'Cannon damage'], ['fist', 'ROCKET FIST', 'Fist damage'], ['blade', 'CHAIN BLADE', 'Blade damage']];
   const upgCost = (k) => 25 * (G.upg[k] + 1);
   function renderHangar() {
     $('#hSal').textContent = G.salvage;
+    $('#mechs').innerHTML = MECHS.map((m) => {
+      const open = G.boss >= m.need, on = mech().id === m.id;
+      return `<div class="mech ${on ? 'on' : ''} ${open ? '' : 'locked'}" style="--ac:${m.accent}">
+        <b>${m.name}</b><p class="muted">${open ? m.blurb : `Beat ${BOSS(m.need).name} to unlock.`}</p>
+        <p class="muted">Hull ${Math.round(m.hp * 100)}% &middot; Damage ${Math.round(m.dmg * 100)}%</p>
+        ${open ? `<button class="btn ${on ? '' : 'cy'}" data-mech="${m.id}" ${on ? 'disabled' : ''}>${on ? 'SELECTED' : 'SELECT'}</button>` : ''}</div>`;
+    }).join('');
     let h = '';
     for (const [k, name, what] of UPG) {
       const lv = G.upg[k], max = lv >= 5;
@@ -1469,7 +1661,10 @@
   click('#btnHangar', () => { mode = 'hangar'; show('hangar'); renderHangar(); });
   click('#btnSound', () => { setSound(!AU.on); renderMap(); });
   document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { sfx.ui(); if (mode === 'dex' && prevMode === 'title') { mode = 'title'; show('title'); } else toMap(); }));
-  $('#sectors').addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (!b) return; audioInit(); sfx.ui(); goFullscreen(); startMission(+b.dataset.s, b.dataset.go); });
+  $('#sectors').addEventListener('click', (e) => { const b = e.target.closest('[data-sec]'); if (!b) return; audioInit(); sfx.ui(); openMissions(+b.dataset.sec); });
+  $('#msList').addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (!b) return; audioInit(); sfx.ui(); goFullscreen(); startMission(+b.dataset.s, b.dataset.go); });
+  click('#btnEndless', () => { goFullscreen(); startMission(1, 'endless'); });
+  $('#mechs').addEventListener('click', (e) => { const b = e.target.closest('[data-mech]'); if (!b || b.disabled) return; G.mech = b.dataset.mech; save(); sfx.level(); renderHangar(); });
   $('#upgrades').addEventListener('click', (e) => {
     const b = e.target.closest('[data-buy]'); if (!b || b.disabled) return;
     const k = b.dataset.buy;

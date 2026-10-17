@@ -115,6 +115,18 @@
   .ktop .nm em { font-style: normal; color: var(--orange); }
   .hb { height: 8px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.25); border-radius: 5px; overflow: hidden; margin-top: 3px; }
   .hb i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff4d5e, #ff9b52); transition: width .12s; }
+  #k2 { font-size: 11px; color: var(--dim); margin-top: 3px; min-height: 14px; }
+  #guard { top: calc(56px + var(--st)); left: calc(10px + var(--sl)); width: min(28vw, 220px); font-size: 11px; letter-spacing: 1px; text-shadow: 0 1px 2px #000; }
+  #ghp { background: linear-gradient(90deg, #5dffa8, #b8ff6a); }
+  .mrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .mrow p { margin: 2px 0 0; }
+  .done { color: var(--green); }
+  .mechs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .mech { border: 1px solid var(--line); border-left: 4px solid var(--ac); border-radius: 10px; padding: 8px 10px; background: rgba(12,22,36,.8); }
+  .mech p { margin: 4px 0; font-size: 11px; }
+  .mech.on { box-shadow: 0 0 0 2px var(--ac); }
+  .mech.locked { opacity: .5; }
+  .mech .btn { width: 100%; padding: 6px; margin-top: 4px; }
   #wave { top: calc(10px + var(--st)); right: calc(14px + var(--sr)); font-size: 12px; color: var(--dim); letter-spacing: 1px; }
   #pauseBtn { top: calc(8px + var(--st)); left: calc(10px + var(--sl)); width: 40px; height: 40px; border-radius: 10px; pointer-events: auto; background: rgba(10,18,30,.6); border: 1px solid var(--line); font-size: 16px; }
   .pbars { bottom: calc(10px + var(--sb)); left: 50%; transform: translateX(-50%); width: min(38vw, 380px); font-size: 11px; letter-spacing: 1px; }
@@ -187,8 +199,9 @@
     <div style="display:flex;flex-direction:column;gap:10px;width:100%">
       <div class="bar glass">
         <button id="mapBack" class="btn" aria-label="Back">&lsaquo;</button>
-        <div class="pilot"><b>GYPSY R4NG3R</b><span class="lv" id="mLv">LV 1</span><div class="xp"><i id="mXp"></i></div></div>
+        <div class="pilot"><b id="mName">GYPSY R4NG3R</b><span class="lv" id="mLv">LV 1</span><div class="xp"><i id="mXp"></i></div></div>
         <div class="res"><b id="mSal">0</b> SALVAGE &middot; <b id="mKits">2</b> KITS</div>
+        <button id="btnEndless" class="btn hot">ENDLESS</button>
         <button id="btnHangar" class="btn">HANGAR</button>
         <button id="btnDexM" class="btn">DEX</button>
         <button id="btnSound" class="btn" aria-label="Sound">&#9835;</button>
@@ -198,10 +211,20 @@
     </div>
   </section>
 
+  <section id="missions" class="screen panel">
+    <div class="card glass">
+      <h2><span id="msTitle"></span> <button class="btn" data-back>BACK</button></h2>
+      <div id="msList"></div>
+    </div>
+  </section>
+
   <section id="hangar" class="screen panel">
     <div class="card glass">
       <h2>SH4TT3RD0ME HANGAR <button class="btn" data-back>DONE</button></h2>
       <p class="muted">Spend salvage on GYPSY R4NG3R. <b id="hSal" style="color:var(--ink)">0</b> salvage available.</p>
+      <h3 class="muted" style="margin:10px 0 6px">J4GR</h3>
+      <div id="mechs" class="mechs"></div>
+      <h3 class="muted" style="margin:14px 0 0">UPGRADES</h3>
       <div id="upgrades" class="up"></div>
     </div>
   </section>
@@ -231,7 +254,8 @@
 
   <div id="hud">
     <button id="pauseBtn" aria-label="Pause">&#10074;&#10074;</button>
-    <div class="ktop"><div class="nm"><span id="kName"></span><em id="kCat"></em></div><div class="hb"><i id="khp"></i></div></div>
+    <div class="ktop"><div class="nm"><span id="kName"></span><em id="kCat"></em></div><div class="hb"><i id="khp"></i></div><div id="k2"></div></div>
+    <div id="guard"><span id="gName"></span><div class="hb"><i id="ghp"></i></div></div>
     <div id="wave"></div>
     <div class="pbars">
       <div class="lab"><span>HULL</span><span id="phpT"></span></div><div class="hb"><i id="php"></i></div>

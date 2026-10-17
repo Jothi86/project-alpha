@@ -21,10 +21,22 @@ attack will land, and a dodge at the last moment slows time. Their weak points s
 armour plates that crack as you shoot them. Once a plate breaks, shots there do heavy
 damage, and a staggered K41JU can be finished with the blade.
 
-Pick a sector on the mission map. A patrol is three K41JU back to back. Each sector's
-boss opens the next one: KN1FEHED, 0TACH1, L3ATHERBAK, R41JU and finally SL4TT3RN at
-TH3 BR34CH. You level up, spend salvage on upgrades in the hangar, and every K41JU you
-meet is logged in the K41JU-DEX. There's a synth soundtrack, every sector has its own
+Each of the five sectors has five missions:
+- **Patrol:** three K41JU back to back.
+- **Defend:** protect a landmark (the Penang Bridge, George Town, an oil rig) from acid attacks.
+- **Escort:** keep a ferry afloat for 60 seconds.
+- **Twin Strike:** two K41JU at once.
+- **Boss:** KN1FEHED, 0TACH1, L3ATHERBAK, R41JU and finally SL4TT3RN at TH3 BR34CH.
+  Beating a boss opens the next sector.
+
+Endless mode keeps the waves coming until you fall and records your best. Beating
+bosses also unlocks more J4GRs, and each plays differently:
+- STRYKA EUR3KA fires salvo shots and has the longest dodge window.
+- CR1MS0N TYPH00N fires non-stop.
+- CH3RNO ALF4 is heavily armoured and hits hard.
+
+You level up, spend salvage in the hangar, and log every K41JU in the K41JU-DEX.
+Keyboard: WASD to move, arrows or mouse to aim, Enter to fire, 1-4 for weapons. There's a synth soundtrack, every sector has its own
 weather, and it also plays with mouse and keyboard.
 
 A free fan tribute, not affiliated with any film studio. All art and music are original.
