@@ -1,28 +1,30 @@
 ---
 title: PAC1F1C R1M
-summary: 8-bit giant-robot vs. sea-monster game — walk the Penang coast like a Game Boy RPG, then fight K41JU in first person from the J4GR cockpit.
+summary: First-person giant robot vs. sea monsters, built for a phone held sideways. Aim with one thumb, dodge with the other, and shoot the armour off K41JU.
 status: live
-date: 2026-10-04
-tags: [rpg, shooter, 8-bit, canvas, mobile]
+date: 2026-10-17
+tags: [shooter, first-person, mobile, canvas, boss-fights]
 cover: covers/pac1f1c-r1m.png
 links:
   demo: /play/pac1f1c-r1m/
 ---
 
-You pilot GYPSY R4NG3R, with MAK0 riding in the DR1FT and MARSHAL ST4CK giving the
-orders from the SH4TT3RD0ME in Butterworth.
+You pilot GYPSY R4NG3R with MAK0 in the DR1FT, looking out of the cockpit at a K41JU
+rising from the sea. Turn the phone sideways. Your right thumb drags the crosshair, and
+lifting it fires the plasma cannon; hold longer for a charged shot. Your left thumb
+swipes to sidestep between three lanes. The ROCKET FIST, CHAIN BLADE, OVERDRIVE and
+repair kits are buttons.
 
-Out on the map it plays like a Game Boy RPG. You walk a pixel Penang coast (George Town,
-the bridge, the strait) in a four-shade palette, talk to other pilots, and patrol the
-dark water where K41JU surface at random. When one appears, the game switches to a
-first-person cockpit view: strafe left and right to dodge acid and claw swipes, aim up and
-down at the glowing weak points, and charge the plasma cannon. The Rocket Fist and Chain
-Blade unlock as you level up.
+Every K41JU telegraphs its attacks: a raised claw, a glowing throat before an acid spit,
+a roar before it charges, bubbles when it dives. A red lane on the water shows where each
+attack will land, and a dodge at the last moment slows time. Their weak points sit under
+armour plates that crack as you shoot them. Once a plate breaks, shots there do heavy
+damage, and a staggered K41JU can be finished with the blade.
 
-There are five sectors, each held shut by a buoy line until you beat its boss: KN1FEHED,
-0TACH1, L3ATHERBAK, R41JU and finally SL4TT3RN at TH3 BR34CH. Your mech gains XP and levels
-like a Pokémon would. You spend salvage on upgrades at the dome, and every K41JU you meet is
-logged in the K41JU-DEX. Your progress saves in the browser. It works with keyboard or
-on-screen touch controls, comes with four palettes, and plays chiptune music.
+Pick a sector on the mission map. A patrol is three K41JU back to back. Each sector's
+boss opens the next one: KN1FEHED, 0TACH1, L3ATHERBAK, R41JU and finally SL4TT3RN at
+TH3 BR34CH. You level up, spend salvage on upgrades in the hangar, and every K41JU you
+meet is logged in the K41JU-DEX. There's a synth soundtrack, every sector has its own
+weather, and it also plays with mouse and keyboard.
 
 A free fan tribute, not affiliated with any film studio. All art and music are original.

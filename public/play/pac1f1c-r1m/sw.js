@@ -1,7 +1,7 @@
 // sw.js — makes the game installable and lets it open without a signal.
 
-const CACHE = 'pr-v1';
-const SHELL = ['./', 'manifest.webmanifest', 'icons/icon-192.png', 'art.js', 'game.js'];
+const CACHE = 'pr-v2';
+const SHELL = ['./', 'manifest.webmanifest', 'icons/icon-192.png', 'game.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
