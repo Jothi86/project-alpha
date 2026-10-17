@@ -9,6 +9,16 @@ links:
   demo: /play/pac1f1c-r1m/
 ---
 
+**Story mode:** a fan retelling of the film's arc with re-spelled names, set around Penang.
+It opens with a prologue in which Y4NCY is lost fighting KN1FEHED. Five years later
+MARSHAL ST4CK finds RAL3Y working on the coastal wall and brings him back. MAK0 joins the
+DR1FT, then come the double event at George Town, H4NN1BAL CH0W's bone market, the hunt
+for R41JU, and Operation PITF4LL at TH3 BR34CH.
+
+Between fights you roam an **open sea**: the Penang waters seen from above. Roaming K41JU
+show up as sonar shadows and give chase when you get close. Gold markers lead the story,
+side missions sit out on the water, and the SH4TT3RD0ME is your base.
+
 You pilot GYPSY R4NG3R with MAK0 in the DR1FT, looking out of the cockpit at a K41JU
 rising from the sea. Turn the phone sideways. Your right thumb drags the crosshair, and
 lifting it fires the plasma cannon; hold longer for a charged shot. Your left thumb

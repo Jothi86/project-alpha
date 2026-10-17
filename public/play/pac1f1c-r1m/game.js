@@ -95,7 +95,7 @@
 
   // ================= save =================
   const SAVE = 'pac1f1c-r1m-v2';
-  const fresh = () => ({ mech: 'gypsy', done: {}, best: 0, lvl: 1, xp: 0, salvage: 0, kits: 2, upg: { armor: 0, plasma: 0, fist: 0, blade: 0 }, boss: 0, dex: {}, sound: true, tut: 0 });
+  const fresh = () => ({ ch: 0, pos: null, tonic: 0, mech: 'gypsy', done: {}, best: 0, lvl: 1, xp: 0, salvage: 0, kits: 2, upg: { armor: 0, plasma: 0, fist: 0, blade: 0 }, boss: 0, dex: {}, sound: true, tut: 0 });
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(SAVE));
@@ -108,6 +108,7 @@
   let G = load();
   const hadSave = !!G;
   if (!G) G = fresh();
+  if (G.ch === undefined) G.ch = G.boss >= 5 ? 7 : G.boss >= 4 ? 6 : G.boss >= 3 ? 4 : G.boss >= 2 ? 3 : G.boss >= 1 ? 1 : 0;
   const save = () => { try { localStorage.setItem(SAVE, JSON.stringify(G)); } catch {} };
   const maxHp = () => Math.round((60 + 12 * G.lvl) * (1 + 0.12 * G.upg.armor) * mech().hp);
   const xpNeed = () => 10 + 12 * G.lvl;
@@ -679,11 +680,14 @@
   const vib = (p) => { try { navigator.vibrate?.(p); } catch {} };
 
   // ================= DOM helpers =================
-  const screens = ['title', 'map', 'missions', 'hangar', 'dex', 'result', 'pause'];
+  const screens = ['title', 'map', 'missions', 'hangar', 'dex', 'shop', 'result', 'pause'];
+  let pausePrev = 'battle';
   let mode = 'title', prevMode = 'title';
   function show(id) {
     for (const s of screens) $('#' + s).classList.toggle('show', s === id);
-    $('#hud').classList.toggle('show', id === 'battle' || id === 'pause');
+    $('#hud').classList.toggle('show', id === 'battle' || (id === 'pause' && pausePrev === 'battle'));
+    $('#seaHud').classList.toggle('show', id === 'sea' || (id === 'pause' && pausePrev === 'sea'));
+    $('#scene').classList.toggle('show', id === 'scene');
   }
   let toastT = 0, subT = 0;
   function toast(s, dur = 1.1, warn = false) { const e = $('#toast'); e.textContent = s; e.classList.add('on'); e.classList.toggle('warn', warn); toastT = dur; }
@@ -711,26 +715,29 @@
   let uidN = 0;
   const front = () => B.Ks.filter((k) => !k.done).sort((a, b) => (a.st === 'dying') - (b.st === 'dying') || b.p - a.p)[0] || null;
 
-  function startMission(sec, type) {
+  function startMission(sec, type, opts = {}) {
     audioInit();
     let waves;
-    if (type === 'boss') waves = [[{ sp: BOSS(sec), lvl: BOSS_LVL[sec] }]];
+    if (opts.waves) waves = opts.waves.map((w) => w.map((e) => ({ ...e })));
+    else if (type === 'boss') waves = [[{ sp: BOSS(sec), lvl: BOSS_LVL[sec] }]];
     else if (type === 'twin') waves = sec >= 2 ? [[one(sec), one(sec)], [one(sec), one(sec, 1)]] : [[one(sec), one(sec)]];
     else if (type === 'endless') { sec = endlessSec(1); waves = [endlessWave(1)]; }
     else if (type === 'escort') waves = [[one(sec)]];
     else waves = [0, 1, 2].map((i) => [one(sec, i === 2 ? 1 : 0)]);
-    const M = mech();
+    const M = opts.mech ? MECHS.find((m) => m.id === opts.mech) : mech();
     B = {
+      opts, fromSea: !!opts.fromSea,
       sec, type, waves, wi: 0, xp: 0, sal: 0, kills: 0, hp: maxHp(), lane: 0, camX: 0, roll: 0, iframe: 0, lastDodge: -9, M,
       aim: { x: W * 0.5, y: H * 0.42 }, charging: false, charge: 0, cdShot: 0, cdFist: 0, cdBlade: 0, drift: 50, desync: 0, emp: 0,
       od: 0, odT: 0, proj: [], shock: [], parts: [], nums: [], beams: [], fists: [], gshots: [], slashT: 0, recoil: 0, fistOut: 0,
       sel: slotOpen(G.sel || 0) ? G.sel || 0 : 0, stepCd: 0, hitstop: 0, slow: 0, shake: 0, hurtT: 0, t: 0, phase: 'fight', phaseT: 0, K: null, Ks: [], said: {}, muzzle: { x: W * 0.8, y: H * 0.8 }, fistTip: { x: W * 0.2, y: H * 0.8 },
       endless: type === 'endless',
-      guard: type === 'defend' ? { name: PLACES[sec], hp: 100, max: 100, flash: 0 } : type === 'escort' ? { name: 'FERRY', hp: 100, max: 100, flash: 0, ferry: true } : null,
+      guard: type === 'defend' ? { name: opts.guard || PLACES[sec], hp: 100, max: 100, flash: 0 } : type === 'escort' ? { name: 'FERRY', hp: 100, max: 100, flash: 0, ferry: true } : null,
       escort: type === 'escort' ? { t: 0, dur: 60 } : null,
     };
     mode = 'battle'; show('battle');
-    music(type === 'boss' || type === 'endless' ? 'boss' : 'battle');
+    music(type === 'boss' || type === 'endless' || opts.boss ? 'boss' : 'battle');
+    if (G.tonic > 0) { G.tonic--; B.drift = 100; save(); }
     spawnWave();
     $('#keys').classList.toggle('hide', !!G.keysHidden);
     $('#guard').style.display = B.guard ? '' : 'none';
@@ -744,7 +751,7 @@
       endless: ["Endless waves. Let's see how long we last.", 'MAK0'],
       patrol: [`Patrolling ${SECTOR[sec]}. Three contacts inbound.`, 'MAK0'],
     }[type];
-    sub(lines[0], lines[1], 3);
+    if (opts.intro) sub(opts.intro[0], opts.intro[1], 3); else sub(lines[0], lines[1], 3);
   }
   function makeKaiju(sp, lvl) {
     const boss = !!sp.boss, hpMax = Math.round(sp.hp * (1 + 0.28 * (lvl - 1)) * (boss ? 1.6 : 1.25));
@@ -759,6 +766,7 @@
     const w = B.waves[B.wi];
     B.Ks = w.map((e, i) => {
       const K = makeKaiju(e.sp, e.lvl);
+      if (B.opts.kHpMul) { K.hpMax = K.hp = Math.round(K.hpMax * B.opts.kHpMul); K.weak.forEach((w) => { w.armorMax = w.armor = K.hpMax * 0.12; }); }
       if (w.length > 1) { K.off = i ? 0.9 : -0.9; K.x = K.off; K.p = i ? 0.34 : 0.44; }
       G.dex[e.sp.id] = Math.max(G.dex[e.sp.id] || 0, 1);
       return K;
@@ -872,6 +880,10 @@
     if (!K.enraged && K.hp > 0 && K.hp < K.hpMax * (K.boss ? 0.5 : 0.35)) {
       K.enraged = true;
       if (K.boss) { toast(`${K.sp.name} IS ENRAGED!`, 1.4, true); sfx.roar(); B.shake = 0.5; }
+    }
+    if (B.opts.mid && !B.midDone && K.hp > 0 && K.hp < K.hpMax * B.opts.mid.at) {
+      B.midDone = true; B.charging = false; B.proj = []; B.shock = [];
+      setTimeout(() => scene(B.opts.mid.lines, () => { mode = 'battle'; show('battle'); }, 'battle'), 30);
     }
     if (K.hp <= 0) killKaiju(K);
   }
@@ -1105,8 +1117,9 @@
     if (B.phase === 'over') return;
     B.phase = 'over'; B.charging = false; humStop();
     const s = B, M = s.M;
+    s.won = win;
     let extra = '';
-    if (win && s.type !== 'endless') {
+    if (win && s.type !== 'endless' && s.opts.story === undefined && !s.opts.contact) {
       G.done[`${s.sec}:${s.type}`] = 1;
       if (['defend', 'escort', 'twin'].includes(s.type)) {
         const bonus = 10 + 5 * s.sec; s.sal += bonus; G.salvage += bonus;
@@ -1116,7 +1129,7 @@
     if (win && s.type === 'boss' && G.boss < s.sec) {
       G.boss = s.sec; G.kits++;
       extra += s.sec < 5 ? `<p>The buoy line to <b>${SECTOR[s.sec + 1]}</b> is down. +1 repair kit.</p>` : '<p><b>TH3 BR34CH collapses in on itself. The K41JU war is over.</b><br>Thanks for playing PAC1F1C R1M.</p>';
-      const nm = MECHS.find((m) => m.need === s.sec);
+      const nm = s.opts.story === undefined && MECHS.find((m) => m.need === s.sec);
       if (nm) extra += `<p><b style="color:${nm.accent}">${nm.name}</b> joins the program. Pick it in the HANGAR.</p>`;
     }
     let title;
@@ -1125,7 +1138,8 @@
       G.best = Math.max(G.best, waves);
       title = `SURVIVED ${waves} WAVE${waves === 1 ? '' : 'S'}`;
       extra = `<p>${best ? 'New best!' : `Best: ${G.best} waves.`}</p>` + extra;
-    } else if (win) {
+    } else if (win && s.opts.winTitle) title = s.opts.winTitle;
+    else if (win) {
       title = { boss: `${s.waves[0][0].sp.name} DEFEATED`, defend: `${PLACES[s.sec]} HOLDS`, escort: 'FERRY SAFE', twin: 'TWIN STRIKE CLEARED', patrol: 'SECTOR CLEAR' }[s.type];
     } else title = s.guard && s.guard.hp <= 0 ? `${s.guard.name} LOST` : `${M.name} DOWN`;
     save();
@@ -1135,6 +1149,7 @@
       if (mode !== 'battle' || B !== s) return;
       $('#resTitle').textContent = title;
       $('#resTitle').className = win || s.endless ? 'win' : 'lose';
+      $('#resMap').textContent = s.opts.story !== undefined && win ? 'CONTINUE STORY' : 'CONTINUE';
       $('#resBody').innerHTML = `<p>${s.kills} K41JU neutralized &middot; +${s.xp} XP &middot; +${s.sal} salvage</p><p>Pilot LV ${G.lvl}. ${win || s.endless ? '' : 'MAK0 pulled you out. You keep what you earned.'}</p>${extra}`;
       mode = 'result'; show('result');
     }, win ? 1300 : 1600);
@@ -1501,7 +1516,7 @@
     $('#mLv').textContent = `LV ${G.lvl}`;
     $('#mXp').style.width = `${G.xp / xpNeed() * 100}%`;
     $('#mSal').textContent = G.salvage; $('#mKits').textContent = G.kits;
-    $('#brief').textContent = MARSHAL[Math.min(G.boss, 5)];
+    $('#brief').textContent = `${CH[G.ch].name}: ${CH[G.ch].obj}`;
     $('#btnSound').style.opacity = AU.on ? 1 : 0.4;
     let html = '';
     for (let s = 1; s <= 5; s++) {
@@ -1523,8 +1538,9 @@
     $('#msTitle').textContent = `0${s} ${SECTOR[s]}`;
     $('#msList').innerHTML = MISSIONS(s).map(([t, name, desc]) => {
       const done = t === 'boss' ? G.boss >= s : G.done[`${s}:${t}`];
-      return `<div class="mrow"><div><b>${name}</b> ${done ? '<span class="done">&#10003;</span>' : ''}<p class="muted">${desc}</p></div>
-        <button class="btn ${t === 'boss' ? 'hot' : 'cy'}" data-go="${t}" data-s="${s}">PLAY</button></div>`;
+      const story = t === 'boss' && !done;
+      return `<div class="mrow"><div><b>${name}</b> ${done ? '<span class="done">&#10003;</span>' : ''}<p class="muted">${story ? 'Reached through the story. Follow the gold marker at sea.' : desc}</p></div>
+        <button class="btn ${t === 'boss' ? 'hot' : 'cy'}" data-go="${t}" data-s="${s}" ${story ? 'disabled' : ''}>${story ? 'STORY' : t === 'boss' ? 'REMATCH' : 'PLAY'}</button></div>`;
     }).join('');
   }
   const UPG = [['armor', 'ARMOUR', 'More hull'], ['plasma', 'PLASMA', 'Cannon damage'], ['fist', 'ROCKET FIST', 'Fist damage'], ['blade', 'CHAIN BLADE', 'Blade damage']];
@@ -1576,6 +1592,7 @@
   let aimPtr = null, dodgePtr = null;
   cv.addEventListener('pointerdown', (e) => {
     audioInit();
+    if (mode === 'sea') { SEA.joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0 }; try { cv.setPointerCapture(e.pointerId); } catch {} return; }
     if (mode !== 'battle') return;
     e.preventDefault();
     const mouse = e.pointerType === 'mouse';
@@ -1587,6 +1604,11 @@
     try { cv.setPointerCapture(e.pointerId); } catch {}
   });
   cv.addEventListener('pointermove', (e) => {
+    if (mode === 'sea' && SEA.joy && SEA.joy.id === e.pointerId) {
+      let dx = e.clientX - SEA.joy.ox, dy = e.clientY - SEA.joy.oy; const l = Math.hypot(dx, dy);
+      if (l > 60) { dx *= 60 / l; dy *= 60 / l; }
+      SEA.joy.dx = dx; SEA.joy.dy = dy; return;
+    }
     if (mode !== 'battle' || !B) return;
     if (e.pointerType === 'mouse') { B.aim.x = e.clientX; B.aim.y = e.clientY; return; }
     if (aimPtr && aimPtr.id === e.pointerId) {
@@ -1600,6 +1622,7 @@
     }
   });
   const endPtr = (e) => {
+    if (SEA.joy && SEA.joy.id === e.pointerId) SEA.joy = null;
     if (aimPtr && aimPtr.id === e.pointerId) { const m = aimPtr.mouse; aimPtr = null; if (m) fireUp(); else release(); }
     if (dodgePtr && dodgePtr.id === e.pointerId) dodgePtr = null;
   };
@@ -1619,6 +1642,8 @@
     const k = e.code;
     if (k.startsWith('Arrow') || k === 'Space') e.preventDefault();
     keysHeld[k] = true;
+    if (mode === 'scene') { if (!e.repeat && (k === 'Enter' || k === 'Space' || k === 'NumpadEnter')) sceneTap(); else if (k === 'Escape') sceneSkip(); return; }
+    if (mode === 'sea') { if (!e.repeat && (k === 'Enter' || k === 'KeyE' || k === 'Space' || k === 'NumpadEnter')) seaInteract(); else if (k === 'Escape' || k === 'KeyP') pause(); return; }
     if (mode === 'battle') {
       if (e.repeat) return;
       if (k === 'KeyA') dodge(-1);
@@ -1638,9 +1663,9 @@
     if (mode === 'battle' && (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space')) fireUp();
   });
   addEventListener('blur', () => { for (const k in keysHeld) keysHeld[k] = false; });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'battle') pause(); });
-  function pause() { if (mode !== 'battle') return; release(); mode = 'pause'; show('pause'); }
-  function resume() { mode = 'battle'; show('battle'); last = performance.now(); }
+  document.addEventListener('visibilitychange', () => { if (document.hidden && (mode === 'battle' || mode === 'sea')) pause(); });
+  function pause() { if (mode !== 'battle' && mode !== 'sea') return; if (mode === 'battle') release(); pausePrev = mode; SEA.joy = null; mode = 'pause'; show('pause'); }
+  function resume() { mode = pausePrev; show(pausePrev); last = performance.now(); }
 
   const click = (sel, fn) => $(sel).addEventListener('click', (e) => { audioInit(); sfx.ui(); fn(e); });
   function goFullscreen() {
@@ -1649,20 +1674,20 @@
     el.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
   }
   function toMap() { mode = 'map'; show('map'); renderMap(); music('menu'); }
-  click('#btnPlay', () => { goFullscreen(); toMap(); });
+  click('#btnPlay', () => { goFullscreen(); toSea(); });
   let wipeArmed = 0;
   click('#btnNew', () => {
     if (hadSave && G.lvl + G.boss > 1 && Date.now() - wipeArmed > 3000) { wipeArmed = Date.now(); $('#btnNew').textContent = 'TAP AGAIN TO WIPE SAVE'; return; }
-    const snd = AU.on; G = fresh(); G.sound = snd; save(); $('#btnNew').textContent = 'NEW GAME'; goFullscreen(); toMap();
+    const snd = AU.on; G = fresh(); G.sound = snd; save(); SEA.ks = []; SEA.x = 1500; SEA.y = 5900; $('#btnNew').textContent = 'NEW GAME'; goFullscreen(); toSea();
   });
   click('#btnDexT', () => { prevMode = 'title'; mode = 'dex'; show('dex'); renderDex(); });
   click('#btnDexM', () => { prevMode = 'map'; mode = 'dex'; show('dex'); renderDex(); });
-  click('#mapBack', () => { mode = 'title'; show('title'); });
+  click('#mapBack', () => toSea());
   click('#btnHangar', () => { mode = 'hangar'; show('hangar'); renderHangar(); });
   click('#btnSound', () => { setSound(!AU.on); renderMap(); });
-  document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { sfx.ui(); if (mode === 'dex' && prevMode === 'title') { mode = 'title'; show('title'); } else toMap(); }));
+  document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { sfx.ui(); if (mode === 'dex' && prevMode === 'title') { mode = 'title'; show('title'); } else if (mode === 'shop') toSea(); else toMap(); }));
   $('#sectors').addEventListener('click', (e) => { const b = e.target.closest('[data-sec]'); if (!b) return; audioInit(); sfx.ui(); openMissions(+b.dataset.sec); });
-  $('#msList').addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (!b) return; audioInit(); sfx.ui(); goFullscreen(); startMission(+b.dataset.s, b.dataset.go); });
+  $('#msList').addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (!b || b.disabled) return; audioInit(); sfx.ui(); goFullscreen(); startMission(+b.dataset.s, b.dataset.go); });
   click('#btnEndless', () => { goFullscreen(); startMission(1, 'endless'); });
   $('#mechs').addEventListener('click', (e) => { const b = e.target.closest('[data-mech]'); if (!b || b.disabled) return; G.mech = b.dataset.mech; save(); sfx.level(); renderHangar(); });
   $('#upgrades').addEventListener('click', (e) => {
@@ -1671,13 +1696,607 @@
     if (k === 'kit') { G.salvage -= 20; G.kits++; } else { G.salvage -= upgCost(k); G.upg[k]++; }
     sfx.level(); save(); renderHangar();
   });
+  $('#shopList').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-shop]'); if (!b || b.disabled) return;
+    const it = SHOP.find((x) => x[0] === b.dataset.shop), cost = it[3]();
+    G.salvage -= cost;
+    if (it[0] === 'kit') G.kits++; else if (it[0] === 'tonic') G.tonic = (G.tonic || 0) + 1; else G.upg.armor++;
+    sfx.level(); save(); renderShop();
+  });
+  $('#scene').addEventListener('click', (e) => { if (e.target.closest('#sSkip')) return; sceneTap(); });
+  click('#sSkip', sceneSkip);
+  click('#seaAct', seaInteract);
+  click('#seaMenu', pause);
   $('#dexGrid').addEventListener('click', (e) => { const c = e.target.closest('[data-dex]'); if (c) { sfx.ui(); dexDetail(+c.dataset.dex); } });
-  click('#resMap', toMap);
-  click('#resAgain', () => startMission(B.sec, B.type));
+  click('#resMap', () => {
+    const b = B;
+    if (b.opts.story !== undefined && b.won) storyWin(b.opts.story);
+    else if (b.fromSea) { if (!b.won && !b.endless) { SEA.x = DOCK.x; SEA.y = DOCK.y; } toSea(); }
+    else toMap();
+  });
+  click('#resAgain', () => startMission(B.sec, B.type, B.opts));
   click('#pauseBtn', pause);
   click('#pResume', resume);
   click('#pSound', () => setSound(!AU.on));
-  click('#pQuit', () => { humStop(); toMap(); });
+  click('#pQuit', () => { humStop(); if (pausePrev === 'sea') { mode = 'title'; show('title'); } else if (B && B.fromSea) toSea(); else toMap(); });
+
+  // ================= story =================
+  const SPK = {
+    NARRATOR: ['#cfe3f2', ''], 'MARSHAL ST4CK': ['#ff8a3d', 'MS'], RAL3Y: ['#4fe3ff', 'R'], Y4NCY: ['#7fd0ff', 'Y'], MAK0: ['#ff7ab8', 'M'],
+    T3ND0: ['#7dff9a', 'T'], N3WT: ['#fff07a', 'N'], H3RMANN: ['#b9c4cf', 'H'], 'H4NN1BAL CH0W': ['#ffd23f', 'HC'], 'CHUCK H4NS3N': ['#e0b070', 'C'],
+  };
+  const SC = {
+    prologue: [
+      { title: 'PROLOGUE · FIVE YEARS AGO' },
+      ['NARRATOR', 'The K41JU came up through TH3 BR34CH, a rift at the bottom of the sea. To fight them we built J4GRs: machines too big for one mind, so two pilots share the load through a neural link called the DR1FT.'],
+      ['NARRATOR', 'The Selat Strait, two in the morning. A fishing fleet is caught in the open.'],
+      ['Y4NCY', 'Category III, coming in fast. The crews are calling it KN1FEHED.'],
+      ['RAL3Y', "Then we're the only thing between it and those boats. GYPSY R4NG3R, moving out."],
+      ['Y4NCY', 'Aim, fire, sidestep. Same as always, little brother.'],
+    ],
+    yancy: [
+      ['NARRATOR', "KN1FEHED's blade-skull punches straight through the cockpit wall."],
+      ['Y4NCY', 'RAL3Y! Get the boats out. Get her ho—'],
+      ['NARRATOR', 'The link goes silent. Y4NCY is gone. RAL3Y is alone in the DR1FT, carrying a whole J4GR in one head.'],
+      ['RAL3Y', 'Not like this. Not tonight.'],
+    ],
+    prologueEnd: [
+      ['NARRATOR', 'RAL3Y finished KN1FEHED alone, walked GYPSY R4NG3R to shore, and never climbed into a cockpit again.'],
+    ],
+    wall: [
+      { title: 'CHAPTER 1 · THE WALL' },
+      ['NARRATOR', 'Five years later. The K41JU come faster now. The world has given up on J4GRs and is building sea walls instead.'],
+      ['NARRATOR', 'RAL3Y welds steel plate on the Penang coastal wall in exchange for ration cards.'],
+      ['MARSHAL ST4CK', 'RAL3Y. You were hard to find.'],
+      ['RAL3Y', 'That was the point, Marshal.'],
+      ['MARSHAL ST4CK', 'Four J4GRs are left in the world, all at the Penang SH4TT3RD0ME. One of them is GYPSY R4NG3R, rebuilt. I need someone who has carried her alone and lived.'],
+      ['RAL3Y', '...Where do you want me?'],
+      ['MARSHAL ST4CK', 'Butterworth, across the strait. Walk her over. The world is ending; try not to be late.'],
+      ['NARRATOR', 'OPEN SEA: move with WASD, or drag anywhere on the screen. Follow the gold marker.'],
+    ],
+    dome: [
+      { title: 'CHAPTER 2 · DR1FT COMPATIBLE' },
+      ['T3ND0', 'Welcome to the SH4TT3RD0ME, Ranger. Terrible coffee, excellent robots.'],
+      ['MARSHAL ST4CK', 'These are the last crews. CH3RNO ALF4. CR1MS0N TYPH00N. And STRYKA EUR3KA, with the H4NS3Ns.'],
+      ['CHUCK H4NS3N', 'So this is the guy who quit. Stay out of my way out there.'],
+      ['N3WT', "Hi! N3WT. I study K41JU. I'm a big fan. Of studying them. Mostly."],
+      ['H3RMANN', "H3RMANN. Mathematics. The attacks are speeding up: soon two at a time, then four. My numbers don't lie, unlike N3WT."],
+      ['MAK0', "I've watched every one of your fights. The files don't do you justice."],
+      ['MARSHAL ST4CK', 'MAK0 will be your co-pilot. Prove the DR1FT holds: clear the K41JU at the PENANG BRIDGE.'],
+    ],
+    trial: [
+      ['MAK0', "Starting the neural handshake. Don't chase my memories, RAL3Y. Let them pass."],
+      ['RAL3Y', 'Copy. Right hemisphere is yours.'],
+    ],
+    mako: [
+      ['MAK0', 'During the handshake I remembered something. A city on fire. I was small, holding one red shoe.'],
+      ['MAK0', 'A K41JU was right in front of me. Then a J4GR stepped between us. The pilot climbed down and held out his hand.'],
+      ['RAL3Y', 'That pilot was the Marshal.'],
+      ['MAK0', 'He raised me. Today he finally let me fly.'],
+    ],
+    double: [
+      { title: 'CHAPTER 3 · DOUBLE EVENT' },
+      ['T3ND0', 'Two signatures! Category IV, both of them, heading straight for George Town!'],
+      ['H3RMANN', 'A double event. I said this would happen. Nobody listens to the mathematician.'],
+      ['MARSHAL ST4CK', 'CH3RNO ALF4, CR1MS0N TYPH00N, STRYKA EUR3KA: deploy. GYPSY stays in reserve.'],
+      ['NARRATOR', 'Within twenty minutes CH3RNO and CR1MS0N are torn apart, and an EMP blast leaves STRYKA dead in the water.'],
+      ['MARSHAL ST4CK', '...Launch GYPSY R4NG3R. Hold George Town.'],
+    ],
+    afterDouble: [
+      ['MAK0', 'Both down. George Town is still standing.'],
+      ['MARSHAL ST4CK', 'The crews will rebuild CH3RNO and CR1MS0N from the wreckage. You can take them out from the hangar.'],
+      ['N3WT', 'Marshal, I did a thing. I drifted with a piece of K41JU brain.'],
+      ['N3WT', "They're not animals. They're weapons, grown and cloned by someone on the other side and sent through."],
+      ['H3RMANN', 'And TH3 BR34CH reads K41JU DNA, like a lock. A bomb only gets through riding on a K41JU.'],
+      ['N3WT', 'I need a fresher brain. Only one man sells those: H4NN1BAL CH0W, down at the George Town docks.'],
+      { title: 'CHAPTER 4 · THE BONE MARKET' },
+    ],
+    market: [
+      ['H4NN1BAL CH0W', 'Welcome to the bone market. Bone powder, K41JU skin, a little bit of heart. All very nearly legal.'],
+      ['H4NN1BAL CH0W', "A brain? Expensive. But for the Marshal's people, my shop is open. Bring salvage."],
+      ['N3WT', "Something's wrong. The K41JU felt my drift. They're hunting for me now."],
+      ['T3ND0', "Big signature in the Deep Trench. It's R41JU, and it's fast."],
+      ['MARSHAL ST4CK', 'Hunt it down before it reaches the coast.'],
+      { title: 'CHAPTER 5 · THE TRENCH' },
+      ['NARRATOR', "H4NN1BAL CH0W's BONE MARKET is now open at the George Town docks."],
+    ],
+    pitfall: [
+      { title: 'CHAPTER 6 · OPERATION PITF4LL' },
+      ['MARSHAL ST4CK', 'We end this now. Operation PITF4LL.'],
+      ['MARSHAL ST4CK', 'STRYKA EUR3KA carries the bomb. CHUCK and I will pilot her.'],
+      ['RAL3Y', "Marshal, you can't drift. Your body won't take it."],
+      ['MARSHAL ST4CK', 'Then I will go as far as it lets me. GYPSY escorts us to TH3 BR34CH.'],
+      ['MAK0', 'Sir...'],
+      ['MARSHAL ST4CK', 'Today we hold the line, one last time.'],
+    ],
+    ending: [
+      ['NARRATOR', "STRYKA's bomb tears open the way down. The Marshal and CHUCK don't come back up."],
+      ['MAK0', "The Breach is still open. It won't let the bomb through without K41JU DNA."],
+      ['RAL3Y', "Then we bring our own. SL4TT3RN's body. We ride it down."],
+      ['NARRATOR', 'GYPSY R4NG3R falls through TH3 BR34CH carrying a dead Category V. RAL3Y sets the reactor to overload and fires MAK0 up in her escape pod. Then he follows her.'],
+      ['NARRATOR', 'Two pods break the surface as the rift collapses behind them. The sky goes quiet.'],
+      ['MAK0', 'RAL3Y... we did it.'],
+      { title: 'THE END' },
+      ['T3ND0', 'The Breach is sealed, but stragglers still roam the sea. Hunt them, finish side missions, or test yourselves in ENDLESS at the SH4TT3RD0ME.'],
+    ],
+  };
+  // Chapters: where the gold marker sits and what the objective says.
+  const CH = [
+    { name: 'PROLOGUE', obj: 'Stop KN1FEHED.' },
+    { name: 'CHAPTER 1 · THE WALL', obj: 'Report to the SH4TT3RD0ME in Butterworth.', at: 'dome' },
+    { name: 'CHAPTER 2 · DR1FT COMPATIBLE', obj: 'Handshake trial: clear the K41JU at the PENANG BRIDGE.', at: [2300, 4880] },
+    { name: 'CHAPTER 3 · DOUBLE EVENT', obj: 'Defend GEORGE TOWN.', at: [2170, 4250] },
+    { name: 'CHAPTER 4 · THE BONE MARKET', obj: 'Find H4NN1BAL CH0W at the George Town docks.', at: [2140, 4560] },
+    { name: 'CHAPTER 5 · THE TRENCH', obj: 'Hunt R41JU in the DEEP TRENCH.', at: [2700, 1480] },
+    { name: 'CHAPTER 6 · OPERATION PITF4LL', obj: 'Reach TH3 BR34CH.', at: [2100, 760] },
+    { name: 'EPILOGUE', obj: 'The Breach is sealed. Hunt stragglers, clear side missions, or try ENDLESS at the SH4TT3RD0ME.' },
+  ];
+
+  let SCN = null;
+  function scene(lines, done, bg) {
+    humStop();
+    SCN = { lines: [...lines], i: -1, done, bg: bg || (mode === 'battle' ? 'battle' : mode === 'sea' ? 'sea' : 'attract'), full: '', shown: 0 };
+    mode = 'scene'; show('scene');
+    nextLine();
+  }
+  function nextLine() {
+    SCN.i++;
+    if (SCN.i >= SCN.lines.length) {
+      const d = SCN.done; SCN = null; $('#scene').classList.remove('show');
+      last = performance.now();
+      if (d) d();
+      return;
+    }
+    const L = SCN.lines[SCN.i];
+    if (L.title) {
+      $('#sTitle').textContent = L.title; $('#sTitle').classList.add('on'); $('.sbox').style.visibility = 'hidden';
+      SCN.full = ''; SCN.shown = 0; sfx.roar();
+      return;
+    }
+    $('#sTitle').classList.remove('on'); $('.sbox').style.visibility = '';
+    const [who, text] = L, sp = SPK[who] || SPK.NARRATOR;
+    $('#sWho').textContent = who === 'NARRATOR' ? '' : who;
+    $('#sWho').style.color = sp[0];
+    $('#sAv').textContent = sp[1]; $('#sAv').style.display = sp[1] ? '' : 'none'; $('#sAv').style.borderColor = sp[0];
+    $('#sText').classList.toggle('narr', who === 'NARRATOR');
+    SCN.full = text; SCN.shown = 0; $('#sText').textContent = '';
+  }
+  function sceneTap() {
+    if (!SCN) return;
+    if (SCN.shown < SCN.full.length) { SCN.shown = SCN.full.length; $('#sText').textContent = SCN.full; return; }
+    sfx.ui(); nextLine();
+  }
+  function sceneSkip() { if (!SCN) return; SCN.i = SCN.lines.length - 1; nextLine(); }
+  function sceneTick(dt) {
+    if (!SCN || SCN.shown >= SCN.full.length) return;
+    const before = Math.floor(SCN.shown);
+    SCN.shown = Math.min(SCN.full.length, SCN.shown + dt * 55);
+    if (Math.floor(SCN.shown) !== before) $('#sText').textContent = SCN.full.slice(0, Math.floor(SCN.shown));
+  }
+
+  function startStory() {
+    scene(SC.prologue, () => startMission(1, 'boss', {
+      story: 0, mech: 'gypsy', waves: [[{ sp: byId('knifehed'), lvl: 1 }]], kHpMul: 0.7,
+      mid: { at: 0.5, lines: SC.yancy }, intro: ['Category III, closing fast. Stay with me.', 'Y4NCY'], winTitle: 'KN1FEHED DOWN',
+    }), 'attract');
+  }
+  function storyArrive(ch) {
+    if (ch === 1) scene(SC.dome, () => { G.ch = 2; save(); toSea(); });
+    else if (ch === 2) scene(SC.trial, () => startMission(1, 'patrol', { story: 2, fromSea: true, waves: [[{ sp: byId('scuttle'), lvl: 2 }], [{ sp: byId('grimlurk'), lvl: 3 }]], intro: ['Handshake steady. Here they come.', 'MAK0'], winTitle: 'DR1FT COMPATIBLE' }));
+    else if (ch === 3) startMission(2, 'defend', { story: 3, fromSea: true, guard: 'GEORGE TOWN', boss: true, waves: [[{ sp: byId('leatherbak'), lvl: 8 }], [{ sp: byId('otachi'), lvl: 9 }]], intro: ['L3ATHERBAK first, then 0TACH1. Keep them off the city!', 'MARSHAL ST4CK'], winTitle: 'GEORGE TOWN HOLDS' });
+    else if (ch === 4) scene(SC.market, () => { G.ch = 5; save(); toSea(); });
+    else if (ch === 5) startMission(4, 'boss', { story: 5, fromSea: true, waves: [[{ sp: byId('raiju'), lvl: 13 }]], intro: ["It's fast. Let it come to us.", 'MAK0'], winTitle: 'R41JU DOWN' });
+    else if (ch === 6) startMission(5, 'boss', { story: 6, fromSea: true, waves: [[{ sp: byId('raiju'), lvl: 15 }, { sp: byId('abyssor'), lvl: 15 }], [{ sp: byId('slattern'), lvl: 18 }]], intro: ['Two Category IVs guarding the rift. Clear the way for STRYKA!', 'MARSHAL ST4CK'], winTitle: 'SL4TT3RN DOWN' });
+  }
+  function storyWin(ch) {
+    if (ch === 0) scene(SC.prologueEnd.concat(SC.wall), () => { G.boss = Math.max(G.boss, 1); G.ch = 1; SEA.x = 1500; SEA.y = 5900; save(); toSea(); }, 'attract');
+    else if (ch === 2) scene(SC.mako.concat(SC.double), () => { G.ch = 3; save(); toSea(); }, 'attract');
+    else if (ch === 3) scene(SC.afterDouble, () => { G.boss = Math.max(G.boss, 3); G.ch = 4; save(); toSea(); }, 'attract');
+    else if (ch === 5) scene(SC.pitfall, () => { G.boss = Math.max(G.boss, 4); G.ch = 6; save(); toSea(); }, 'attract');
+    else if (ch === 6) scene(SC.ending, () => { G.boss = 5; G.ch = 7; save(); toSea(); }, 'attract');
+    else toSea();
+  }
+
+  // ================= open sea =================
+  // World units ~ metres; y grows southward. Penang island sits south-west, the mainland east.
+  const WORLD = { w: 4200, h: 6000 };
+  const ISLAND = [[1000, 4420], [1300, 4260], [1700, 4230], [1980, 4300], [2075, 4520], [2050, 4860], [2010, 5250], [1900, 5620], [1600, 5790], [1250, 5760], [1010, 5560], [900, 5200], [930, 4800]];
+  const MAINLAND = [[2620, 3700], [2540, 3960], [2580, 4210], [2510, 4450], [2560, 4700], [2500, 5000], [2570, 5300], [2520, 5600], [2580, 6000], [4200, 6000], [4200, 3480], [3300, 3560]];
+  const ROCKS = [[700, 3000, 60], [3300, 2500, 80], [1750, 2100, 50], [900, 1500, 70], [3500, 1200, 60], [2600, 2950, 40], [1450, 800, 55], [3100, 320, 70], [3600, 3000, 50]];
+  const DOCK = { x: 2455, y: 4560 }, DOME = { x: 2720, y: 4560 }, MARKET = { x: 2140, y: 4560 };
+  const BAND_Y = [0, 3600, 2700, 1800, 900, 0];
+  const secAtY = (y) => (y >= 3600 ? 1 : y >= 2700 ? 2 : y >= 1800 ? 3 : y >= 900 ? 4 : 5);
+  const SEA_COL = ['', '#114253', '#0d3150', '#0a2443', '#06142b', '#220a28'];
+  const SIDE = [
+    { sec: 1, type: 'defend', x: 2290, y: 5160 }, { sec: 1, type: 'escort', x: 2330, y: 4680 },
+    { sec: 2, type: 'defend', x: 1900, y: 4120 }, { sec: 2, type: 'escort', x: 1500, y: 3250 },
+    { sec: 3, type: 'defend', x: 1200, y: 2390 }, { sec: 3, type: 'escort', x: 2900, y: 2250 },
+    { sec: 4, type: 'defend', x: 2720, y: 1300 }, { sec: 4, type: 'escort', x: 1350, y: 1300 },
+    { sec: 5, type: 'defend', x: 2280, y: 1120 }, { sec: 5, type: 'escort', x: 3050, y: 620 },
+  ];
+  const inPoly = (x, y, poly) => {
+    let c = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  };
+  const onLand = (x, y) => inPoly(x, y, ISLAND) || inPoly(x, y, MAINLAND) || ROCKS.some(([rx, ry, r]) => Math.hypot(x - rx, y - ry) < r);
+  const SEA = { x: 1500, y: 5900, vx: 0, vy: 0, ang: -Math.PI / 2, walk: 0, wake: [], wakeT: 0, ks: [], spawnT: 0, grace: 0, sec: 1, joy: null, near: null, armed: true, lastBlock: -9, camX: 1500, camY: 5900, saveT: 0 };
+  const GT_BLOCKS = SEEDED(70, (i, a, b) => ({ x: 1890 + (i % 10) * 18 + a * 6, y: 4290 + Math.floor(i / 10) * 30 + b * 8, w: 12 + a * 6, h: 14 + b * 8, c: a > 0.5 ? '#b5523b' : '#c9734f' })).filter((q) => inPoly(q.x, q.y, ISLAND) && inPoly(q.x + q.w, q.y + q.h, ISLAND));
+  const BW_BLOCKS = SEEDED(60, (i, a, b) => ({ x: 2600 + (i % 6) * 34 + a * 8, y: 4250 + Math.floor(i / 6) * 60 + b * 10, w: 20 + a * 10, h: 22 + b * 10, c: a > 0.5 ? '#6f7a86' : '#8a939c' })).filter((q) => Math.hypot(q.x - DOME.x, q.y - DOME.y) > 170 && inPoly(q.x, q.y, MAINLAND));
+
+  function sideOpen(m) { return G.ch >= 2 && G.boss >= m.sec - 1; }
+  function storyPoint() {
+    const c = CH[G.ch];
+    if (!c || !c.at) return null;
+    return c.at === 'dome' ? DOCK : { x: c.at[0], y: c.at[1] };
+  }
+  function barrierLimit() {
+    for (let s = 2; s <= 5; s++) if (G.boss < s - 1) return { y: BAND_Y[s - 1] + 30, s };
+    return { y: 60, s: 0 };
+  }
+  function randWater(s) {
+    const lo = s === 1 ? 3650 : BAND_Y[s] + 40, hi = s === 1 ? 5950 : BAND_Y[s - 1] - 40;
+    for (let i = 0; i < 25; i++) {
+      const x = rnd(120, WORLD.w - 120), y = rnd(lo, hi);
+      if (!onLand(x, y) && Math.hypot(x - SEA.x, y - SEA.y) > 700 && Math.hypot(x - DOCK.x, y - DOCK.y) > 500) return { x, y };
+    }
+    return null;
+  }
+  function seaSpawn() {
+    const ms = maxSec();
+    for (let s = 1; s <= ms; s++) {
+      const want = s === 1 ? 4 : 3;
+      for (let i = SEA.ks.filter((k) => k.sec === s).length; i < want; i++) {
+        const p = randWater(s); if (!p) continue;
+        const r = rowPick(s), twin = s >= 2 && Math.random() < 0.22;
+        SEA.ks.push({ x: p.x, y: p.y, tx: p.x, ty: p.y, sec: s, sp: byId(r[0]), sp2: twin ? byId(rowPick(s)[0]) : null, lvl: irnd(r[1], r[2]), ang: 0, ph: Math.random() * 9 });
+      }
+    }
+  }
+  function toSea() {
+    if (G.ch === 0) { startStory(); return; }
+    mode = 'sea'; show('sea'); music('menu');
+    SEA.grace = 3; SEA.joy = null; SEA.armed = false;
+    SEA.camX = SEA.x; SEA.camY = SEA.y;
+    if (!SEA.ks.length) seaSpawn();
+    $('#objCh').textContent = CH[G.ch].name; $('#objText').textContent = CH[G.ch].obj;
+  }
+  function seaContact(k) {
+    SEA.ks = SEA.ks.filter((o) => o !== k);
+    toast('K41JU CONTACT!', 1, true); sfx.roar();
+    const w = k.sp2 ? [{ sp: k.sp, lvl: k.lvl }, { sp: k.sp2, lvl: k.lvl }] : [{ sp: k.sp, lvl: k.lvl }];
+    startMission(k.sec, k.sp2 ? 'twin' : 'patrol', { fromSea: true, contact: true, waves: [w] });
+  }
+  function seaInteract() { if (SEA.near) { sfx.ui(); SEA.near.act(); } }
+
+  function seaUpdate(dt) {
+    let ix = 0, iy = 0;
+    if (keysHeld.KeyA || keysHeld.ArrowLeft) ix--;
+    if (keysHeld.KeyD || keysHeld.ArrowRight) ix++;
+    if (keysHeld.KeyW || keysHeld.ArrowUp) iy--;
+    if (keysHeld.KeyS || keysHeld.ArrowDown) iy++;
+    if (SEA.joy) { ix = SEA.joy.dx / 60; iy = SEA.joy.dy / 60; }
+    const il = Math.hypot(ix, iy); if (il > 1) { ix /= il; iy /= il; }
+    const top = 320;
+    SEA.vx = lerp(SEA.vx, ix * top, Math.min(1, dt * 5)); SEA.vy = lerp(SEA.vy, iy * top, Math.min(1, dt * 5));
+    let nx = clamp(SEA.x + SEA.vx * dt, 40, WORLD.w - 40), ny = clamp(SEA.y + SEA.vy * dt, 40, WORLD.h - 40);
+    const lim = barrierLimit();
+    if (ny < lim.y) { ny = lim.y; SEA.vy = Math.max(0, SEA.vy); if (T - SEA.lastBlock > 3 && lim.s) { SEA.lastBlock = T; toast(`RESTRICTED · DEFEAT ${BOSS(lim.s - 1).name} FIRST`, 1.6, true); } }
+    if (!onLand(nx, ny)) { SEA.x = nx; SEA.y = ny; }
+    else if (!onLand(nx, SEA.y)) SEA.x = nx;
+    else if (!onLand(SEA.x, ny)) SEA.y = ny;
+    else { SEA.vx = SEA.vy = 0; }
+    const spd = Math.hypot(SEA.vx, SEA.vy);
+    if (spd > 25) {
+      const ta = Math.atan2(SEA.vy, SEA.vx); let da = ta - SEA.ang;
+      while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU;
+      SEA.ang += da * Math.min(1, dt * 8);
+    }
+    SEA.walk += spd * dt * 0.03;
+    SEA.wakeT -= dt;
+    if (spd > 40 && SEA.wakeT <= 0) { SEA.wakeT = 0.07; SEA.wake.push({ x: SEA.x, y: SEA.y, life: 1.6 }); }
+    for (const w of SEA.wake) w.life -= dt;
+    SEA.wake = SEA.wake.filter((w) => w.life > 0);
+    SEA.camX = lerp(SEA.camX, SEA.x + SEA.vx * 0.4, Math.min(1, dt * 4)); SEA.camY = lerp(SEA.camY, SEA.y + SEA.vy * 0.4, Math.min(1, dt * 4));
+    SEA.grace = Math.max(0, SEA.grace - dt);
+    const sNow = secAtY(SEA.y);
+    if (sNow !== SEA.sec) { SEA.sec = sNow; toast(`SECTOR ${sNow} · ${SECTOR[sNow]}`, 1.6); }
+    // K41JU signatures
+    SEA.spawnT -= dt; if (SEA.spawnT <= 0) { SEA.spawnT = 8; seaSpawn(); }
+    for (const k of SEA.ks) {
+      const dp = Math.hypot(SEA.x - k.x, SEA.y - k.y), dd = Math.hypot(DOCK.x - k.x, DOCK.y - k.y);
+      let tx = k.tx, ty = k.ty, sp = 55;
+      if (dp < 380 && SEA.grace <= 0 && Math.hypot(SEA.x - DOCK.x, SEA.y - DOCK.y) > 420) { tx = SEA.x; ty = SEA.y; sp = 170 + k.sec * 8; }
+      else if (Math.hypot(k.tx - k.x, k.ty - k.y) < 40 || dd < 450) {
+        const p = randWater(k.sec); if (p && Math.hypot(p.x - k.x, p.y - k.y) < 1400) { k.tx = p.x; k.ty = p.y; }
+      }
+      const a = Math.atan2(ty - k.y, tx - k.x), nx2 = k.x + Math.cos(a) * sp * dt, ny2 = k.y + Math.sin(a) * sp * dt;
+      if (!onLand(nx2, ny2)) { k.x = nx2; k.y = ny2; k.ang = a; } else { const p = randWater(k.sec); if (p) { k.tx = p.x; k.ty = p.y; } }
+      k.ph += dt;
+      if (dp < 80 && SEA.grace <= 0) { seaContact(k); return; }
+    }
+    // Story marker: walking into it starts the next chapter.
+    const sp = storyPoint();
+    if (sp) {
+      const d = Math.hypot(SEA.x - sp.x, SEA.y - sp.y);
+      if (d < 170 && SEA.armed) { SEA.armed = false; G.pos = { x: SEA.x, y: SEA.y }; save(); storyArrive(G.ch); return; }
+      if (d > 260) SEA.armed = true;
+    }
+    // Things you can press ENTER on.
+    SEA.near = null;
+    if (Math.hypot(SEA.x - DOCK.x, SEA.y - DOCK.y) < 200) SEA.near = { label: 'ENTER SH4TT3RD0ME', act: () => { G.pos = { x: SEA.x, y: SEA.y }; save(); toMap(); } };
+    else if (G.ch >= 5 && Math.hypot(SEA.x - MARKET.x, SEA.y - MARKET.y) < 170) SEA.near = { label: 'BONE MARKET', act: openShop };
+    else for (const m of SIDE) {
+      if (sideOpen(m) && Math.hypot(SEA.x - m.x, SEA.y - m.y) < 150) {
+        const name = MISSIONS(m.sec).find((r) => r[0] === m.type)[1];
+        SEA.near = { label: name, act: () => { G.pos = { x: SEA.x, y: SEA.y }; save(); startMission(m.sec, m.type, { fromSea: true }); } };
+        break;
+      }
+    }
+    const btn = $('#seaAct');
+    btn.style.display = SEA.near ? '' : 'none';
+    if (SEA.near && btn.dataset.l !== SEA.near.label) { btn.dataset.l = SEA.near.label; btn.innerHTML = `${SEA.near.label} <kbd>ENTER</kbd>`; }
+    SEA.saveT -= dt; if (SEA.saveT <= 0) { SEA.saveT = 5; G.pos = { x: SEA.x, y: SEA.y }; save(); }
+  }
+
+  // ---- open sea drawing ----
+  let ZOOM = 1;
+  const wx = (x) => (x - SEA.camX) * ZOOM + W / 2, wy = (y) => (y - SEA.camY) * ZOOM + H / 2;
+  function smoothPath(poly) {
+    ctx.beginPath();
+    const n = poly.length, mid = (i) => [(poly[i][0] + poly[(i + 1) % n][0]) / 2, (poly[i][1] + poly[(i + 1) % n][1]) / 2];
+    let m = mid(n - 1); ctx.moveTo(wx(m[0]), wy(m[1]));
+    for (let i = 0; i < n; i++) { m = mid(i); ctx.quadraticCurveTo(wx(poly[i][0]), wy(poly[i][1]), wx(m[0]), wy(m[1])); }
+    ctx.closePath();
+  }
+  function drawLand(poly) {
+    smoothPath(poly);
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(110,220,230,.16)'; ctx.lineWidth = 70 * ZOOM; ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${0.3 + 0.15 * Math.sin(T * 2)})`; ctx.lineWidth = 10 * ZOOM; ctx.stroke();
+    ctx.strokeStyle = '#cdb57e'; ctx.lineWidth = 16 * ZOOM; ctx.stroke();
+    const g = ctx.createLinearGradient(0, wy(3500), 0, wy(6000));
+    g.addColorStop(0, '#2f6040'); g.addColorStop(1, '#1f4430');
+    ctx.fillStyle = g; ctx.fill();
+  }
+  function label(text, x, y, col = '#e8f4ff', size = 12) {
+    ctx.font = `700 ${size}px "Chakra Petch"`; ctx.textAlign = 'center';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.strokeText(text, x, y);
+    ctx.fillStyle = col; ctx.fillText(text, x, y); ctx.textAlign = 'left';
+  }
+  function seaDraw() {
+    ZOOM = Math.min(W, H * 1.6) / 1400;
+    const vx0 = SEA.camX - W / 2 / ZOOM, vx1 = SEA.camX + W / 2 / ZOOM, vy0 = SEA.camY - H / 2 / ZOOM, vy1 = SEA.camY + H / 2 / ZOOM;
+    // water: one colour per sector band, blended across each boundary
+    for (let s = 1; s <= 5; s++) {
+      const top = s === 5 ? -500 : BAND_Y[s], bot = s === 1 ? WORLD.h + 500 : BAND_Y[s - 1];
+      ctx.fillStyle = SEA_COL[s]; ctx.fillRect(0, wy(top), W, wy(bot) - wy(top) + 1);
+    }
+    for (let s = 2; s <= 5; s++) {
+      const b = BAND_Y[s - 1], g = ctx.createLinearGradient(0, wy(b - 220), 0, wy(b + 220));
+      g.addColorStop(0, SEA_COL[s]); g.addColorStop(1, SEA_COL[s - 1]);
+      ctx.fillStyle = g; ctx.fillRect(0, wy(b - 220), W, 440 * ZOOM);
+    }
+    // wave marks
+    ctx.strokeStyle = 'rgba(200,240,255,.13)'; ctx.lineWidth = Math.max(1, 2 * ZOOM); ctx.beginPath();
+    const G0 = 120;
+    for (let gx = Math.floor(vx0 / G0) - 1; gx <= vx1 / G0 + 1; gx++) for (let gy = Math.floor(vy0 / G0) - 1; gy <= vy1 / G0 + 1; gy++) {
+      const h = Math.abs(Math.sin(gx * 12.9898 + gy * 78.233) * 43758.5453) % 1;
+      const x = gx * G0 + h * 80 + Math.sin(T * 0.6 + h * 9) * 10, y = gy * G0 + ((h * 7) % 1) * 80;
+      const X = wx(x), Y = wy(y), L = 14 * ZOOM;
+      ctx.moveTo(X - L, Y); ctx.quadraticCurveTo(X - L / 2, Y - L * 0.5, X, Y); ctx.quadraticCurveTo(X + L / 2, Y + L * 0.5, X + L, Y);
+    }
+    ctx.stroke();
+    // TH3 BR34CH
+    {
+      const X = wx(2100), Y = wy(470);
+      if (Y > -300 && Y < H + 300) {
+        ctx.save(); ctx.translate(X, Y);
+        for (let i = 0; i < 3; i++) { ctx.strokeStyle = `rgba(255,80,170,${0.25 - i * 0.06})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, 0, (380 + i * 90 + (T * 40) % 90) * ZOOM, (140 + i * 35) * ZOOM, 0, 0, TAU); ctx.stroke(); }
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 340 * ZOOM);
+        g.addColorStop(0, 'rgba(160,250,255,.95)'); g.addColorStop(0.15, 'rgba(255,80,170,.75)'); g.addColorStop(1, 'rgba(80,0,60,0)');
+        ctx.scale(1, 0.32); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 340 * ZOOM, 0, TAU); ctx.fill();
+        ctx.restore();
+        if (G.boss < 5) label('TH3 BR34CH', X, Y - 70 * ZOOM, '#ff7ab8', 14); else label('TH3 BR34CH (SEALED)', X, Y - 70 * ZOOM, '#7ff6ff', 13);
+      }
+    }
+    // land
+    drawLand(ISLAND); drawLand(MAINLAND);
+    for (const [rx, ry, r] of ROCKS) {
+      const X = wx(rx), Y = wy(ry);
+      if (X < -100 || X > W + 100 || Y < -100 || Y > H + 100) continue;
+      ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.arc(X, Y, (r + 8) * ZOOM, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#3c4650'; ctx.beginPath(); ctx.arc(X, Y, r * ZOOM, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#56616c'; ctx.beginPath(); ctx.arc(X - r * 0.25 * ZOOM, Y - r * 0.25 * ZOOM, r * 0.55 * ZOOM, 0, TAU); ctx.fill();
+    }
+    for (const q of GT_BLOCKS.concat(BW_BLOCKS)) {
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(wx(q.x + 3), wy(q.y + 3), q.w * ZOOM, q.h * ZOOM);
+      ctx.fillStyle = q.c; ctx.fillRect(wx(q.x), wy(q.y), q.w * ZOOM, q.h * ZOOM);
+    }
+    label('GEORGE TOWN', wx(1960), wy(4270), '#ffe0b0', 13);
+    label('BUTTERWORTH', wx(2800), wy(4230), '#cfd8e0', 12);
+    label('PULAU PINANG', wx(1450), wy(5000), 'rgba(220,240,220,.6)', 16);
+    // bridge
+    {
+      const y = wy(5050), x0 = wx(2040), x1 = wx(2540);
+      ctx.strokeStyle = '#2b3138'; ctx.lineWidth = 22 * ZOOM; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+      ctx.strokeStyle = '#c9d0d6'; ctx.lineWidth = 14 * ZOOM; ctx.stroke();
+      for (const tx of [2230, 2360]) {
+        ctx.fillStyle = '#e8edf1'; ctx.fillRect(wx(tx) - 6 * ZOOM, y - 16 * ZOOM, 12 * ZOOM, 32 * ZOOM);
+        ctx.strokeStyle = 'rgba(230,236,240,.6)'; ctx.lineWidth = 1.5;
+        for (let k = 1; k <= 5; k++) { ctx.beginPath(); ctx.moveTo(wx(tx), y); ctx.lineTo(wx(tx - k * 22), y); ctx.moveTo(wx(tx), y); ctx.lineTo(wx(tx + k * 22), y); ctx.stroke(); }
+      }
+      for (let i = 0; i < 12; i++) { ctx.fillStyle = Math.sin(T * 3 + i) > 0 ? '#ffd27a' : '#806020'; ctx.fillRect(lerp(x0, x1, i / 11) - 1.5, y - 1.5, 3, 3); }
+      label('PENANG BRIDGE', (x0 + x1) / 2, y - 22 * ZOOM, '#e8f4ff', 11);
+    }
+    // SH4TT3RD0ME
+    {
+      const X = wx(DOME.x), Y = wy(DOME.y), R = 120 * ZOOM;
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.arc(X + 8, Y + 8, R, 0, TAU); ctx.fill();
+      const g = ctx.createRadialGradient(X - R * 0.4, Y - R * 0.4, 0, X, Y, R);
+      g.addColorStop(0, '#c7d1db'); g.addColorStop(1, '#4b5866');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X, Y, R, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(30,40,50,.5)'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(X + Math.cos(i * TAU / 8) * R, Y + Math.sin(i * TAU / 8) * R); ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(X, Y, R * 0.55, 0, TAU); ctx.stroke();
+      ctx.fillStyle = '#10161d'; ctx.fillRect(X - R - 10 * ZOOM, Y - 26 * ZOOM, 40 * ZOOM, 52 * ZOOM);
+      for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#ffb347' : '#141414'; ctx.fillRect(X - R - 10 * ZOOM, Y - 26 * ZOOM + i * 9 * ZOOM, 5 * ZOOM, 9 * ZOOM); }
+      for (let i = 0; i < 10; i++) { ctx.fillStyle = Math.sin(T * 4 + i) > 0 ? '#4fe3ff' : '#123'; const a = i * TAU / 10; ctx.fillRect(X + Math.cos(a) * (R + 10 * ZOOM) - 2, Y + Math.sin(a) * (R + 10 * ZOOM) - 2, 4, 4); }
+      label('SH4TT3RD0ME', X, Y - R - 12 * ZOOM, '#4fe3ff', 14);
+    }
+    // other landmarks
+    const mark = (x, y, fn) => { const X = wx(x), Y = wy(y); if (X > -150 && X < W + 150 && Y > -150 && Y < H + 150) fn(X, Y); };
+    mark(1200, 2300, (X, Y) => {
+      ctx.fillStyle = '#2a2f36'; ctx.fillRect(X - 40 * ZOOM, Y - 40 * ZOOM, 80 * ZOOM, 80 * ZOOM);
+      ctx.strokeStyle = '#ffb347'; ctx.lineWidth = 2; ctx.strokeRect(X - 40 * ZOOM, Y - 40 * ZOOM, 80 * ZOOM, 80 * ZOOM);
+      const f = 14 + Math.sin(T * 12) * 4; const g = ctx.createRadialGradient(X + 30 * ZOOM, Y - 30 * ZOOM, 0, X + 30 * ZOOM, Y - 30 * ZOOM, f * ZOOM * 2);
+      g.addColorStop(0, 'rgba(255,220,120,1)'); g.addColorStop(1, 'rgba(255,90,20,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X + 30 * ZOOM, Y - 30 * ZOOM, f * ZOOM * 2, 0, TAU); ctx.fill();
+      label('OIL RIG', X, Y + 58 * ZOOM, '#cfd8e0', 11);
+    });
+    mark(2700, 1350, (X, Y) => {
+      ctx.fillStyle = '#26303a'; ctx.beginPath(); for (let i = 0; i < 6; i++) ctx.lineTo(X + Math.cos(i * TAU / 6) * 50 * ZOOM, Y + Math.sin(i * TAU / 6) * 50 * ZOOM); ctx.fill();
+      ctx.fillStyle = Math.sin(T * 3) > 0 ? '#7df9ff' : '#205060'; ctx.beginPath(); ctx.arc(X, Y, 8 * ZOOM, 0, TAU); ctx.fill();
+      label('TRENCH STATION', X, Y + 68 * ZOOM, '#cfd8e0', 11);
+    });
+    mark(2100, 1000, (X, Y) => {
+      const g = ctx.createRadialGradient(X, Y, 0, X, Y, 60 * ZOOM); g.addColorStop(0, `rgba(127,246,255,${0.6 + 0.3 * Math.sin(T * 3)})`); g.addColorStop(1, 'rgba(127,246,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X, Y, 60 * ZOOM, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#d8f8ff'; ctx.beginPath(); ctx.arc(X, Y, 10 * ZOOM, 0, TAU); ctx.fill();
+      label('SEAL BEACON', X, Y + 40 * ZOOM, '#cfd8e0', 11);
+    });
+    if (G.ch >= 5) mark(MARKET.x, MARKET.y, (X, Y) => {
+      ctx.fillStyle = '#3a2a14'; ctx.fillRect(X - 30 * ZOOM, Y - 16 * ZOOM, 60 * ZOOM, 32 * ZOOM);
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(X - 30 * ZOOM, Y - 16 * ZOOM, 60 * ZOOM, 6 * ZOOM);
+      label("H4NN1BAL'S BONE MARKET", X, Y + 34 * ZOOM, '#ffd23f', 11);
+    });
+    // buoy lines
+    const lim = barrierLimit();
+    for (let s = 2; s <= 5; s++) {
+      if (G.boss >= s - 1) continue;
+      const by = wy(BAND_Y[s - 1]);
+      if (by < -40 || by > H + 40) continue;
+      ctx.strokeStyle = 'rgba(255,77,94,.55)'; ctx.setLineDash([14, 10]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, by); ctx.lineTo(W, by); ctx.stroke(); ctx.setLineDash([]);
+      for (let x = Math.floor(vx0 / 140) * 140; x < vx1 + 140; x += 140) {
+        const X = wx(x), bob = Math.sin(T * 2 + x) * 2;
+        ctx.fillStyle = '#ff4d5e'; ctx.beginPath(); ctx.arc(X, by + bob, 6 * Math.max(ZOOM, 0.6), 0, TAU); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillRect(X - 6 * Math.max(ZOOM, 0.6), by + bob - 1, 12 * Math.max(ZOOM, 0.6), 2);
+      }
+      if (lim.s === s) label(`RESTRICTED · DEFEAT ${BOSS(s - 1).name}`, W / 2, by - 12, '#ff8a95', 12);
+    }
+    // side mission markers
+    for (const m of SIDE) {
+      if (!sideOpen(m)) continue;
+      mark(m.x, m.y, (X, Y) => {
+        const col = m.type === 'defend' ? '#5dffa8' : '#4fa3ff', done = G.done[`${m.sec}:${m.type}`];
+        ctx.strokeStyle = rgba(col, 0.35 + 0.25 * Math.sin(T * 3)); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X, Y, 34 * ZOOM + 6, 0, TAU); ctx.stroke();
+        ctx.fillStyle = rgba(col, 0.85); ctx.beginPath(); ctx.arc(X, Y, 14, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#04121c'; ctx.font = '700 13px "Chakra Petch"'; ctx.textAlign = 'center'; ctx.fillText(m.type === 'defend' ? 'D' : 'E', X, Y + 5); ctx.textAlign = 'left';
+        label(`${m.type === 'defend' ? 'DEFEND' : 'ESCORT'}${done ? ' ✓' : ''}`, X, Y - 22, col, 11);
+      });
+    }
+    // story marker
+    const sp = storyPoint();
+    if (sp) mark(sp.x, sp.y, (X, Y) => {
+      const g = ctx.createLinearGradient(0, Y - 160 * ZOOM, 0, Y);
+      g.addColorStop(0, 'rgba(255,210,63,0)'); g.addColorStop(1, 'rgba(255,210,63,.55)');
+      ctx.fillStyle = g; ctx.fillRect(X - 16 * ZOOM, Y - 160 * ZOOM, 32 * ZOOM, 160 * ZOOM);
+      ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X, Y, (40 + (T * 30) % 40) * ZOOM, 0, TAU); ctx.stroke();
+      label('!', X, Y - 30 * ZOOM - Math.abs(Math.sin(T * 3)) * 10, '#ffd23f', 28);
+    });
+    // K41JU signatures under the water
+    for (const k of SEA.ks) mark(k.x, k.y, (X, Y) => {
+      const g0 = geo(k.sp);
+      ctx.save(); ctx.translate(X, Y); ctx.rotate(k.ang); ctx.scale(ZOOM, ZOOM);
+      const r = (k.ph % 2.2) / 2.2;
+      ctx.strokeStyle = `rgba(255,77,94,${0.5 * (1 - r)})`; ctx.lineWidth = 2 / ZOOM; ctx.beginPath(); ctx.arc(0, 0, 40 + r * 120, 0, TAU); ctx.stroke();
+      ctx.fillStyle = 'rgba(2,6,12,.55)';
+      ctx.beginPath(); ctx.ellipse(0, 0, 54, 30, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-50, 0); ctx.quadraticCurveTo(-90, Math.sin(k.ph * 4) * 20, -120, Math.sin(k.ph * 4 + 1) * 26); ctx.lineWidth = 12; ctx.strokeStyle = 'rgba(2,6,12,.45)'; ctx.stroke();
+      ctx.fillStyle = rgba(g0.glow, 0.7); for (let i = -2; i <= 2; i++) ctx.fillRect(i * 14 - 4, -3, 8, 6);
+      ctx.fillStyle = rgba(g0.glow, 0.95); ctx.beginPath(); ctx.arc(46, -10, 4, 0, TAU); ctx.arc(46, 10, 4, 0, TAU); ctx.fill();
+      if (k.sp2) { ctx.fillStyle = 'rgba(2,6,12,.5)'; ctx.beginPath(); ctx.ellipse(-20, 50, 40, 22, 0, 0, TAU); ctx.fill(); }
+      ctx.restore();
+      if (Math.hypot(k.x - SEA.x, k.y - SEA.y) < 600) label(`${k.sp2 ? 'TWIN · ' : ''}LV ${k.lvl}`, X, Y - 40 * ZOOM, '#ff8a95', 11);
+    });
+    // wake + the J4GR
+    for (const w of SEA.wake) {
+      const a = w.life / 1.6;
+      ctx.strokeStyle = `rgba(230,250,255,${a * 0.45})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(wx(w.x), wy(w.y), (60 - a * 30) * ZOOM, (36 - a * 18) * ZOOM, SEA.ang, 0, TAU); ctx.stroke();
+    }
+    drawSeaMech(wx(SEA.x), wy(SEA.y));
+    // objective arrow when the marker is off screen
+    if (sp) {
+      const X = wx(sp.x), Y = wy(sp.y), m = 46;
+      if (X < m || X > W - 140 || Y < 80 || Y > H - 60) {
+        const a = Math.atan2(Y - H / 2, X - W / 2), ex = clamp(W / 2 + Math.cos(a) * W, m, W - 140), ey = clamp(H / 2 + Math.sin(a) * H, 80, H - 60);
+        ctx.save(); ctx.translate(ex, ey); ctx.rotate(a);
+        ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-10, -11); ctx.lineTo(-10, 11); ctx.fill(); ctx.restore();
+        label(`${Math.round(Math.hypot(sp.x - SEA.x, sp.y - SEA.y))}m`, ex - Math.cos(a) * 26, ey - Math.sin(a) * 26 + 4, '#ffd23f', 11);
+      }
+    }
+    // joystick
+    if (SEA.joy) {
+      ctx.strokeStyle = 'rgba(200,230,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(SEA.joy.ox, SEA.joy.oy, 60, 0, TAU); ctx.stroke();
+      ctx.fillStyle = 'rgba(79,227,255,.5)'; ctx.beginPath(); ctx.arc(SEA.joy.ox + SEA.joy.dx, SEA.joy.oy + SEA.joy.dy, 22, 0, TAU); ctx.fill();
+    }
+    // night tint toward the north
+    const tint = clamp((3600 - SEA.y) / 3600, 0, 1) * 0.35;
+    if (tint > 0) { ctx.fillStyle = `rgba(4,2,16,${tint})`; ctx.fillRect(0, 0, W, H); }
+    drawMini();
+  }
+  function drawSeaMech(X, Y) {
+    const M = mech(), sw = Math.sin(SEA.walk * 2), k = ZOOM * 1.1;
+    ctx.save(); ctx.translate(X, Y); ctx.rotate(SEA.ang + Math.PI / 2); ctx.scale(k, k);
+    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(6, 8, 50, 30, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(220,245,255,.35)'; ctx.beginPath(); ctx.ellipse(0, 0, 56, 34, 0, 0, TAU); ctx.fill();
+    for (const s of [-1, 1]) { ctx.fillStyle = '#2b3542'; ctx.fillRect(s * 16 - 8, -10 + s * sw * 12, 16, 30); }
+    for (const s of [-1, 1]) {
+      ctx.save(); ctx.translate(s * 40, -4); ctx.rotate(-s * sw * 0.35);
+      ctx.fillStyle = metal(-10, 0, 10, 0); ctx.fillRect(-9, -6, 18, 40); ctx.fillStyle = M.trim; ctx.fillRect(-9, 14, 18, 5);
+      ctx.restore();
+    }
+    ctx.fillStyle = metal(-34, 0, 34, 0); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-34, -20, 68, 38, 10) : ctx.rect(-34, -20, 68, 38); ctx.fill();
+    for (const s of [-1, 1]) { ctx.fillStyle = '#56657a'; ctx.beginPath(); ctx.arc(s * 34, -6, 14, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = M.trim; ctx.fillRect(-34, 8, 68, 4);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 16); g.addColorStop(0, '#ffffff'); g.addColorStop(0.4, M.accent); g.addColorStop(1, rgba(M.accent, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#3a4656'; ctx.fillRect(-9, -34, 18, 16); ctx.fillStyle = M.accent; ctx.fillRect(-7, -32, 14, 4);
+    ctx.restore();
+  }
+  const mini = $('#mini'), mctx = mini.getContext('2d');
+  function drawMini() {
+    const w = mini.width, h = mini.height, sx = w / WORLD.w, sy = h / WORLD.h;
+    mctx.clearRect(0, 0, w, h);
+    mctx.fillStyle = 'rgba(4,10,20,.75)'; mctx.fillRect(0, 0, w, h);
+    for (let s = 1; s <= 5; s++) { const top = s === 5 ? 0 : BAND_Y[s], bot = s === 1 ? WORLD.h : BAND_Y[s - 1]; mctx.fillStyle = rgba(SEA_COL[s], 0.9); mctx.fillRect(0, top * sy, w, (bot - top) * sy); }
+    for (const poly of [ISLAND, MAINLAND]) { mctx.fillStyle = '#3c7a50'; mctx.beginPath(); poly.forEach(([x, y], i) => (i ? mctx.lineTo(x * sx, y * sy) : mctx.moveTo(x * sx, y * sy))); mctx.fill(); }
+    for (let s = 2; s <= 5; s++) if (G.boss < s - 1) { mctx.fillStyle = '#ff4d5e'; mctx.fillRect(0, BAND_Y[s - 1] * sy - 1, w, 2); }
+    mctx.fillStyle = '#ff7ab8'; mctx.fillRect(2100 * sx - 6, 470 * sy - 2, 12, 4);
+    mctx.fillStyle = '#4fe3ff'; mctx.fillRect(DOME.x * sx - 3, DOME.y * sy - 3, 6, 6);
+    for (const k of SEA.ks) { mctx.fillStyle = '#ff4d5e'; mctx.fillRect(k.x * sx - 2, k.y * sy - 2, 4, 4); }
+    for (const m of SIDE) if (sideOpen(m)) { mctx.fillStyle = m.type === 'defend' ? '#5dffa8' : '#4fa3ff'; mctx.fillRect(m.x * sx - 2, m.y * sy - 2, 4, 4); }
+    const sp = storyPoint();
+    if (sp && Math.floor(T * 3) % 2) { mctx.fillStyle = '#ffd23f'; mctx.beginPath(); mctx.arc(sp.x * sx, sp.y * sy, 5, 0, TAU); mctx.fill(); }
+    mctx.fillStyle = '#ffffff'; mctx.beginPath(); mctx.arc(SEA.x * sx, SEA.y * sy, 4, 0, TAU); mctx.fill();
+    mctx.strokeStyle = 'rgba(255,255,255,.5)'; mctx.strokeRect((SEA.camX - W / 2 / ZOOM) * sx, (SEA.camY - H / 2 / ZOOM) * sy, W / ZOOM * sx, H / ZOOM * sy);
+  }
+
+  // ---- H4NN1BAL's bone market ----
+  const SHOP = [
+    ['kit', 'REPAIR KIT', 'Heals 40% in battle. Cheaper than the hangar.', () => 15, () => G.kits >= 6],
+    ['tonic', 'DR1FT TONIC', 'Start your next fight with a full DR1FT meter.', () => 30, () => (G.tonic || 0) >= 5],
+    ['plate', 'BONE PLATING', 'K41JU bone bolted onto the hull: +1 armour level.', () => 40 * (G.upg.armor + 1), () => G.upg.armor >= 5],
+  ];
+  function openShop() { mode = 'shop'; show('shop'); renderShop(); }
+  function renderShop() {
+    $('#shSal').textContent = G.salvage;
+    $('#shopList').innerHTML = SHOP.map(([id, name, desc, cost, full]) => `<div class="mrow"><div><b>${name}</b><p class="muted">${desc}${id === 'tonic' ? ` You have ${G.tonic || 0}.` : id === 'kit' ? ` You have ${G.kits}.` : ''}</p></div>
+      <button class="btn cy" data-shop="${id}" ${full() || G.salvage < cost() ? 'disabled' : ''}>${full() ? 'FULL' : cost() + ' SALVAGE'}</button></div>`).join('');
+  }
 
   // ================= main loop =================
   const attract = { sp: byId('slattern'), rise: 1, anim: { ...IDLE } };
@@ -1695,13 +2314,20 @@
   }
   let last = performance.now();
   function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000); last = now; T += dt;
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    stepFrame(dt);
+    requestAnimationFrame(frame);
+  }
+  function stepFrame(dt) {
+    T += dt;
     toastT -= dt; if (toastT <= 0) $('#toast').classList.remove('on');
     subT -= dt; if (subT <= 0) $('#sub').classList.remove('on');
     if (mode === 'battle' && B) { battleUpdate(dt); battleDraw(dt); hud(); }
+    else if (mode === 'sea') { seaUpdate(dt); if (mode === 'sea') seaDraw(); else drawAttract(dt); }
+    else if (mode === 'scene' && SCN) { sceneTick(dt); if (SCN.bg === 'battle' && B) battleDraw(0); else if (SCN.bg === 'sea') seaDraw(); else drawAttract(dt); }
+    else if (mode === 'pause' && pausePrev === 'sea') seaDraw();
     else if ((mode === 'pause' || mode === 'result') && B) battleDraw(0);
     else drawAttract(dt);
-    requestAnimationFrame(frame);
   }
 
   // ================= posters: icons + share image =================
@@ -1736,6 +2362,8 @@
     return new Promise((r) => oc.toBlob(r, 'image/png'));
   }
 
+  if (G.pos) { SEA.x = G.pos.x; SEA.y = G.pos.y; } else if (G.ch >= 1) { SEA.x = DOCK.x; SEA.y = DOCK.y; }
+  $('#btnPlay').textContent = G.ch === 0 ? 'START STORY' : 'CONTINUE';
   requestAnimationFrame(frame);
-  window.__pr = { get G() { return G; }, get B() { return B; }, get mode() { return mode; }, startMission, posterBlob };
+  window.__pr = { get G() { return G; }, get B() { return B; }, get mode() { return mode; }, startMission, posterBlob, SEA, toSea, storyArrive, storyWin, get SCN() { return SCN; }, tick: (n, dt = 1 / 60) => { for (let i = 0; i < n; i++) stepFrame(dt); } };
 })();

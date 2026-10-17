@@ -127,6 +127,30 @@
   .mech.on { box-shadow: 0 0 0 2px var(--ac); }
   .mech.locked { opacity: .5; }
   .mech .btn { width: 100%; padding: 6px; margin-top: 4px; }
+  #seaHud { position: absolute; inset: 0; display: none; pointer-events: none; }
+  #seaHud.show { display: block; }
+  #seaHud > * { position: absolute; }
+  #seaMenu { top: calc(10px + var(--st)); left: calc(10px + var(--sl)); width: 40px; height: 40px; border-radius: 10px; pointer-events: auto; background: rgba(10,18,30,.6); border: 1px solid var(--line); font-size: 16px; }
+  #obj { top: calc(10px + var(--st)); left: calc(60px + var(--sl)); max-width: min(52vw, 520px); padding: 6px 12px; border-radius: 10px; background: rgba(4,8,16,.6); border: 1px solid rgba(255,210,63,.35); font-size: 13px; }
+  #obj small { display: block; color: #ffd23f; font-size: 10px; letter-spacing: 2px; }
+  #mini { top: calc(10px + var(--st)); right: calc(10px + var(--sr)); width: 96px; height: 137px; border-radius: 8px; border: 1px solid var(--line); }
+  #seaAct { right: calc(16px + var(--sr)); bottom: calc(16px + var(--sb)); pointer-events: auto; font-size: 15px; padding: 14px 20px; }
+  #seaKeys { left: calc(12px + var(--sl)); bottom: calc(12px + var(--sb)); font-size: 11px; color: #cfe3f2; background: rgba(4,8,16,.55); padding: 6px 10px; border-radius: 8px; }
+  #seaTouch { left: 50%; bottom: calc(12px + var(--sb)); transform: translateX(-50%); font-size: 11px; color: rgba(200,230,255,.45); letter-spacing: 2px; }
+  @media (pointer: fine) { #seaTouch { display: none; } }
+  #scene { position: fixed; inset: 0; display: none; pointer-events: auto; z-index: 5; background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.1) 40%, rgba(0,0,0,.6)); }
+  #scene.show { display: block; }
+  .sbox { position: absolute; left: 50%; bottom: calc(14px + var(--sb)); transform: translateX(-50%); width: min(760px, calc(100% - 32px)); padding: 12px 16px; }
+  .who { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+  #sAv { width: 30px; height: 30px; border-radius: 50%; border: 2px solid; display: grid; place-items: center; font-style: normal; font-size: 11px; background: rgba(0,0,0,.4); }
+  #sWho { letter-spacing: 2px; font-size: 13px; }
+  #sText { margin: 6px 0 8px; font-size: 16px; line-height: 1.45; min-height: 46px; }
+  #sText.narr { font-style: italic; color: #cfe3f2; }
+  .srow { display: flex; justify-content: space-between; align-items: center; }
+  .srow .btn { padding: 6px 12px; }
+  #sTitle { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-family: 'Russo One'; font-size: clamp(22px, 6vmin, 48px); letter-spacing: 4px; color: #fff;
+    text-shadow: 0 0 24px rgba(79,227,255,.6); opacity: 0; transform: scale(.94); transition: opacity .4s, transform .4s; }
+  #sTitle.on { opacity: 1; transform: none; }
   #wave { top: calc(10px + var(--st)); right: calc(14px + var(--sr)); font-size: 12px; color: var(--dim); letter-spacing: 1px; }
   #pauseBtn { top: calc(8px + var(--st)); left: calc(10px + var(--sl)); width: 40px; height: 40px; border-radius: 10px; pointer-events: auto; background: rgba(10,18,30,.6); border: 1px solid var(--line); font-size: 16px; }
   .pbars { bottom: calc(10px + var(--sb)); left: 50%; transform: translateX(-50%); width: min(38vw, 380px); font-size: 11px; letter-spacing: 1px; }
@@ -198,7 +222,7 @@
   <section id="map" class="screen">
     <div style="display:flex;flex-direction:column;gap:10px;width:100%">
       <div class="bar glass">
-        <button id="mapBack" class="btn" aria-label="Back">&lsaquo;</button>
+        <button id="mapBack" class="btn" aria-label="Back to sea">&lsaquo; SEA</button>
         <div class="pilot"><b id="mName">GYPSY R4NG3R</b><span class="lv" id="mLv">LV 1</span><div class="xp"><i id="mXp"></i></div></div>
         <div class="res"><b id="mSal">0</b> SALVAGE &middot; <b id="mKits">2</b> KITS</div>
         <button id="btnEndless" class="btn hot">ENDLESS</button>
@@ -206,7 +230,7 @@
         <button id="btnDexM" class="btn">DEX</button>
         <button id="btnSound" class="btn" aria-label="Sound">&#9835;</button>
       </div>
-      <div class="brief glass"><b>MARSHAL ST4CK</b><p id="brief"></p></div>
+      <div class="brief glass"><b>OBJECTIVE</b><p id="brief"></p></div>
       <div id="sectors" class="sectors"></div>
     </div>
   </section>
@@ -215,6 +239,14 @@
     <div class="card glass">
       <h2><span id="msTitle"></span> <button class="btn" data-back>BACK</button></h2>
       <div id="msList"></div>
+    </div>
+  </section>
+
+  <section id="shop" class="screen panel">
+    <div class="card glass">
+      <h2>H4NN1BAL'S BONE MARKET <button class="btn" data-back>LEAVE</button></h2>
+      <p class="muted">"Everything here fell off a K41JU. Legally." &middot; <b id="shSal" style="color:var(--ink)">0</b> salvage</p>
+      <div id="shopList"></div>
     </div>
   </section>
 
@@ -279,6 +311,22 @@
     <div id="wsel"></div>
     <div id="swipeHint">&lsaquo; SWIPE &rsaquo;</div>
     <div id="coach"><div class="tip l">Swipe this side left/right to <b>dodge</b>, up/down to <b>step in or back</b></div><div class="tip r">Drag this side to <b>aim</b>. Lift to <b>fire</b>, hold longer to charge</div></div>
+  </div>
+  <div id="seaHud">
+    <button id="seaMenu" aria-label="Menu">&#9776;</button>
+    <div id="obj"><small id="objCh"></small><span id="objText"></span></div>
+    <canvas id="mini" width="240" height="342"></canvas>
+    <button id="seaAct" class="btn hot" style="display:none"></button>
+    <div id="seaKeys" class="keyhint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &middot; <kbd>ENTER</kbd> interact &middot; <kbd>ESC</kbd> menu</div>
+    <div id="seaTouch">Drag anywhere to move</div>
+  </div>
+  <div id="scene">
+    <div id="sTitle"></div>
+    <div class="sbox glass">
+      <div class="who"><i id="sAv"></i><b id="sWho"></b></div>
+      <p id="sText"></p>
+      <div class="srow"><span class="muted">Tap or <kbd>ENTER</kbd></span><button id="sSkip" class="btn">SKIP</button></div>
+    </div>
   </div>
   <div id="toast"></div>
   <div id="sub"></div>
