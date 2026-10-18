@@ -7,9 +7,9 @@
 //   - a report the morning after the event: Excel copy + headcount, emailed to you
 // Everything goes into one Drive folder, and the links are emailed to you.
 
-var EVENT_NAME = '{{EVENT}}';      // e.g. Mid-Autumn Festival 2026
+var EVENT_NAME = '{{EVENT}}';      // e.g. Family Day 2026
 var EVENT_DATE = '{{DATE}}';       // year-month-day, e.g. 2026-09-26
-var ORGANISER  = '{{ORGANISER}}';  // e.g. MPKK Taman Kota Permai
+var ORGANISER  = '{{ORGANISER}}';  // e.g. Taman Sejahtera Residents' Association
 
 // ---------------------------------------------------------------------------
 

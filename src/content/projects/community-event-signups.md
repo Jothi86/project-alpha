@@ -4,11 +4,10 @@ summary: A registration form in three languages, a printable QR poster and an au
 status: live
 date: 2026-09-24
 tags: [community, google forms, qr code, automation]
-techStack: [Google Apps Script, Google Forms, Google Sheets, Python]
+techStack: [Google Apps Script, Google Forms, Google Sheets, Google Docs]
 ---
 
-**The problem:** our residents' committee runs community events, like the
-Mid-Autumn Festival. Every time, someone builds a sign-up form by hand, makes a
+**The problem:** residents' committees run community events all year. Every time, someone builds a sign-up form by hand, makes a
 poster, then copies the responses into a report afterwards. That's half a day of
 work, and the numbers end up scattered across phones and spreadsheets.
 
@@ -22,13 +21,12 @@ work, and the numbers end up scattered across phones and spreadsheets.
   the registrations and a short summary (how many households, how many people in
   total) are saved into the event's folder, and the links arrive by email.
 
-**How it works:** a Google Apps Script builds the form and its responses sheet in
-one go. A small Python script turns the form's link into the QR poster as a Word
-document. A one-off timer in Apps Script runs the export the day after the event,
-then removes itself, so nothing is left running.
+**How it works:** one Google Apps Script builds the form, its responses sheet and
+the QR poster (a Google Doc) in one go. A one-off timer runs the export the day
+after the event, then removes itself, so nothing is left running.
 
-**First use:** the Mid-Autumn Festival on 26 September 2026. The report filed
-itself the next morning: 188 households, 480 people.
+**First use:** a community festival. The report filed itself the next morning:
+188 households, 480 people.
 
 ## Make your own
 
@@ -39,9 +37,9 @@ your residents' details.
 **1. Fill in your event and copy the script.**
 
 <div class="fill" data-src="/kits/event-signup/event-signup.gs" data-copy="Copy my script">
-<label>Event name <input data-key="EVENT" placeholder="Mid-Autumn Festival 2026"></label>
+<label>Event name <input data-key="EVENT" placeholder="Family Day 2026"></label>
 <label>Event date <input data-key="DATE" type="date"></label>
-<label>Organiser <input data-key="ORGANISER" placeholder="MPKK Taman Kota Permai"></label>
+<label>Organiser <input data-key="ORGANISER" placeholder="Taman Sejahtera Residents' Association"></label>
 </div>
 
 **2. Open [script.new](https://script.new)** in a new tab. Sign in with the
