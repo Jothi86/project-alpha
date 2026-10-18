@@ -110,10 +110,10 @@
   }
 
   // --- share ---
-  const text = cfg.text || `${title}:`;
-  const data = () => ({ title, text, url: baseUrl });
+  // Read at click time, so a page can change data-text later (e.g. to share a score).
+  const data = () => ({ title, text: cfg.text || `${title}:`, url: baseUrl });
   function fill() {
-    const { url } = data();
+    const { url, text } = data();
     const links = {
       whatsapp: `https://wa.me/?text=${enc(`${text} ${url}`)}`,
       telegram: `https://t.me/share/url?url=${enc(url)}&text=${enc(text)}`,

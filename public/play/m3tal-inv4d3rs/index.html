@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>M3TAL INV4D3RS</title>
+<meta name="description" content="Space invaders with a run-and-gun soul. Endless waves, weapon drops, tanks and bosses, and one world high-score board. Free in your browser.">
+<meta name="theme-color" content="#1a1410">
+<meta property="og:type" content="website">
+<meta property="og:title" content="M3TAL INV4D3RS">
+<meta property="og:description" content="Endless invader waves, heavy machine guns, a tank, and bosses every fifth wave. Get on the world high-score board. Free in your browser.">
+<meta property="og:url" content="https://project-alpha-dlz.pages.dev/play/m3tal-inv4d3rs/">
+<meta property="og:image" content="https://project-alpha-dlz.pages.dev/play/m3tal-inv4d3rs/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="M3TAL INV4D3RS">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Press+Start+2P&display=swap">
+<script src="/kit/share-install.js" defer data-title="M3TAL INV4D3RS" data-text="Endless invader waves, a tank and bosses, and a world high-score board. Free:"
+  data-url="https://project-alpha-dlz.pages.dev/play/m3tal-inv4d3rs/" data-mount="#kitMount" data-accent="#ffd23a" data-sw="sw.js"></script>
+<style>
+  :root {
+    --sand: #e0b874; --olive: #7a9a3e; --rust: #e03a2e; --gold: #ffd23a; --ink: #fff4e0; --dim: #c9a66b; --dark: #1a1410;
+    --panel: rgba(26, 20, 16, .82);
+    --sl: env(safe-area-inset-left); --sr: env(safe-area-inset-right); --st: env(safe-area-inset-top); --sb: env(safe-area-inset-bottom);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0907; color: var(--ink); }
+  body { font: 10px/1.6 'Press Start 2P', monospace; user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  #cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #ui { position: fixed; inset: 0; pointer-events: none; }
+  .screen { position: absolute; inset: 0; display: none; pointer-events: auto; overflow: auto;
+    padding: calc(14px + var(--st)) calc(16px + var(--sr)) calc(14px + var(--sb)) calc(16px + var(--sl));
+    background: radial-gradient(ellipse at 50% 40%, rgba(12,9,7,.35), rgba(12,9,7,.82)); }
+  .screen.show { display: flex; }
+  .btn { border: 3px solid var(--dark); background: linear-gradient(180deg, #ffe27a, #e0a21a); color: var(--dark); padding: 12px 18px;
+    box-shadow: 0 4px 0 #7a5410, 0 6px 0 var(--dark); letter-spacing: 1px; text-transform: uppercase; transition: transform .06s; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #7a5410, 0 3px 0 var(--dark); }
+  .btn.sm { padding: 8px 10px; font-size: 8px; background: linear-gradient(180deg, #8fb04e, #5a7a2a); color: var(--ink); box-shadow: 0 3px 0 #33461a, 0 5px 0 var(--dark); }
+  .btn.big { font-size: 16px; padding: 16px 40px; }
+  .panel { background: var(--panel); border: 3px solid var(--dark); outline: 2px solid #8f7244; padding: 12px 14px; }
+  .logo { font-family: 'Black Ops One', sans-serif; font-size: clamp(40px, 12vmin, 96px); line-height: .88; margin: 0; letter-spacing: 2px;
+    color: var(--gold); -webkit-text-stroke: 2px var(--dark); text-shadow: 0 4px 0 #b8521a, 0 7px 0 var(--dark), 0 0 30px rgba(255,140,40,.4); }
+  .logo span { display: block; color: #e8eef2; text-shadow: 0 4px 0 #5d6670, 0 7px 0 var(--dark), 0 0 30px rgba(255,140,40,.4); }
+  .tag { color: var(--sand); margin: 12px 0 16px; max-width: 34ch; line-height: 1.8; }
+  .help { color: var(--dim); font-size: 8px; margin: 12px 0 0; line-height: 1.9; }
+  .fan { color: #8f7244; font-size: 7px; margin: 10px 0 0; line-height: 1.8; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  /* Title + game over: two columns in landscape */
+  #title, #over { align-items: center; justify-content: center; gap: clamp(16px, 5vw, 56px); flex-wrap: wrap; }
+  .col { max-width: 420px; }
+  .board h3 { margin: 0 0 8px; color: var(--gold); font-size: 10px; letter-spacing: 2px; }
+  .board ol { list-style: none; margin: 0; padding: 0; min-width: min(300px, 80vw); }
+  .board li { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 8px; padding: 4px 0; font-size: 8px; border-bottom: 1px dashed rgba(201,166,107,.25); }
+  .board li b { color: var(--dim); font-weight: normal; }
+  .board li em { color: #6fe6ff; font-style: normal; }
+  .board li i { color: var(--ink); font-style: normal; text-align: right; min-width: 9ch; }
+  .board li.me { color: var(--gold); background: rgba(255,210,58,.12); }
+  .board li.me i { color: var(--gold); }
+  .board li:first-child span { color: var(--gold); }
+  .board .empty { display: block; color: var(--dim); border: 0; }
+  #myBest { color: var(--dim); font-size: 8px; margin: 10px 0 0; }
+
+  .over-title { white-space: nowrap; font-family: 'Black Ops One', sans-serif; font-size: clamp(34px, 9vmin, 70px); margin: 0; color: var(--rust);
+    -webkit-text-stroke: 2px var(--dark); text-shadow: 0 4px 0 #6a120e, 0 7px 0 var(--dark); }
+  .stat { display: flex; gap: 22px; margin: 14px 0; }
+  .stat div { display: flex; flex-direction: column; gap: 6px; }
+  .stat small { color: var(--dim); font-size: 7px; }
+  .stat strong { font-size: 18px; color: var(--ink); font-weight: normal; }
+  #ovBest { color: var(--gold); margin: 0 0 6px; font-size: 9px; }
+  #ovRank { color: #6fe6ff; margin: 0 0 14px; font-size: 8px; line-height: 1.8; }
+  .callsign { color: var(--dim); font-size: 8px; margin: 0 0 14px; }
+  .callsign b { color: var(--ink); font-weight: normal; }
+  .link { background: none; border: 0; color: var(--gold); text-decoration: underline; padding: 0 0 0 6px; font-size: 8px; }
+  #nameForm { display: flex; gap: 8px; margin: -6px 0 14px; }
+  #nameInput { width: 14ch; background: #0c0907; border: 2px solid #8f7244; padding: 8px; text-transform: uppercase; user-select: text; -webkit-user-select: text; }
+
+  /* Pause */
+  #pause { flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+  #pause h2 { font-family: 'Black Ops One', sans-serif; font-size: 40px; margin: 0 0 6px; color: var(--gold); -webkit-text-stroke: 2px var(--dark); }
+
+  #kitMount { position: fixed; top: calc(10px + var(--st)); right: calc(12px + var(--sr)); pointer-events: auto; display: flex; gap: 8px; z-index: 5; }
+  body.playing #kitMount { display: none; }
+
+  /* Touch controls */
+  #touch { position: absolute; inset: 0; display: none; }
+  body.playing.touch #touch { display: block; }
+  .tbtn { position: absolute; pointer-events: auto; border-radius: 50%; border: 3px solid rgba(26,20,16,.9); display: grid; place-items: center;
+    color: var(--dark); font-size: 9px; touch-action: none; opacity: .85; }
+  .tbtn.on { transform: scale(.92); opacity: 1; }
+  #fireBtn { right: calc(14px + var(--sr)); bottom: calc(18px + var(--sb)); width: 84px; height: 84px; background: radial-gradient(circle at 40% 35%, #ff7a6a, #c42a1e); color: var(--ink); }
+  #fireBtn.auto::after { content: 'AUTO'; position: absolute; bottom: -16px; font-size: 6px; color: var(--dim); }
+  #bombBtn { right: calc(26px + var(--sr)); bottom: calc(118px + var(--sb)); width: 58px; height: 58px; background: radial-gradient(circle at 40% 35%, #b6d46e, #5a7a2a); color: var(--ink); font-size: 7px; }
+  #pad { position: absolute; left: calc(14px + var(--sl)); bottom: calc(18px + var(--sb)); width: 96px; height: 40px; border: 2px dashed rgba(224,184,116,.35);
+    border-radius: 20px; color: rgba(224,184,116,.5); font-size: 7px; display: grid; place-items: center; }
+  #pauseBtn { position: absolute; pointer-events: auto; top: calc(6px + var(--st)); left: 50%; transform: translateX(-50%); width: 34px; height: 26px;
+    background: var(--panel); border: 2px solid #8f7244; color: var(--gold); font-size: 8px; display: none; }
+  body.playing #pauseBtn { display: block; }
+  body:not(.touch) #pauseBtn { top: auto; bottom: calc(4px + var(--sb)); }
+
+  #rotate { position: fixed; inset: 0; display: none; background: #0c0907; z-index: 10; align-items: center; justify-content: center; flex-direction: column; gap: 18px; text-align: center; padding: 24px; pointer-events: auto; }
+  #rotate.show { display: flex; }
+  #rotate .phone { width: 46px; height: 76px; border: 4px solid var(--gold); border-radius: 8px; animation: turn 1.8s ease-in-out infinite; }
+  @keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+
+  @media (max-height: 420px) {
+    .logo { font-size: 46px; }
+    .tag { margin: 8px 0 10px; }
+    .btn.big { font-size: 13px; padding: 12px 28px; }
+    .board li { padding: 2px 0; }
+    .stat { margin: 8px 0; }
+  }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="ui">
+  <div id="kitMount"></div>
+
+  <section id="title" class="screen show">
+    <div class="col">
+      <h1 class="logo">M3TAL<span>INV4D3RS</span></h1>
+      <p class="tag">The waves never stop. They only get meaner. How long can you hold the line?</p>
+      <div class="row">
+        <button id="playBtn" class="btn big">Play</button>
+        <button id="soundBtn" class="btn sm">Sound: on</button>
+      </div>
+      <p class="help" id="help"></p>
+      <p class="fan">A free fan tribute. Not affiliated with SNK. All art and sound are original.</p>
+    </div>
+    <div class="col panel board">
+      <h3>TOP SOLDIERS</h3>
+      <ol id="boardList"><li class="empty">Loading…</li></ol>
+      <p id="myBest"></p>
+    </div>
+  </section>
+
+  <section id="pause" class="screen">
+    <h2>PAUSED</h2>
+    <button id="resumeBtn" class="btn big">Resume</button>
+    <div class="row" style="justify-content:center">
+      <button id="pSound" class="btn sm">Sound</button>
+      <button id="pVoice" class="btn sm">Voice</button>
+      <button id="pAuto" class="btn sm">Auto-fire</button>
+    </div>
+    <button id="quitBtn" class="btn sm">Quit to menu</button>
+  </section>
+
+  <section id="over" class="screen">
+    <div class="col">
+      <h2 class="over-title">GAME OVER</h2>
+      <div class="stat">
+        <div><small>SCORE</small><strong id="ovScore">0</strong></div>
+        <div><small>WAVE</small><strong id="ovWave">1</strong></div>
+      </div>
+      <p id="ovBest"></p>
+      <p id="ovRank"></p>
+      <p class="callsign">Callsign: <b id="ovName"></b><button id="renameBtn" class="link">change</button></p>
+      <form id="nameForm" hidden>
+        <input id="nameInput" maxlength="12" autocomplete="off" spellcheck="false" aria-label="Callsign">
+        <button class="btn sm" type="submit">Save</button>
+      </form>
+      <div class="row">
+        <button id="againBtn" class="btn big">Again</button>
+        <button id="menuBtn" class="btn sm">Menu</button>
+      </div>
+    </div>
+    <div class="col panel board">
+      <h3>WORLD TOP 10</h3>
+      <ol id="ovBoard"></ol>
+    </div>
+  </section>
+
+  <div id="touch">
+    <div id="pad">&lt; DRAG &gt;</div>
+    <button id="bombBtn" class="tbtn">BOMB</button>
+    <button id="fireBtn" class="tbtn">FIRE</button>
+  </div>
+  <button id="pauseBtn" aria-label="Pause">II</button>
+</div>
+<div id="rotate"><div class="phone"></div><p>Turn your phone sideways</p></div>
+<script>if (matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window) document.body.classList.add('touch');</script>
+<script src="art.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
