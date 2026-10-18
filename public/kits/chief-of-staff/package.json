@@ -1,0 +1,8 @@
+{
+  "name": "chief-of-staff-kit",
+  "private": true,
+  "type": "module",
+  "description": "A private Telegram bot that answers you by running Claude Code on your own PC. No dependencies.",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node chief-of-staff.mjs" }
+}

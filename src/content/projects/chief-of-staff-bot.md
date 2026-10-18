@@ -39,3 +39,30 @@ explicit `/send` from me.
 **Try part of it:** the name card reading is available to everyone as the
 [Name Card Scanner](/play/name-card-scanner/), including connecting your own
 Telegram bot.
+
+## Deploy your own
+
+You can run your own copy on your own PC. It answers only you, and it reads only
+the folder you choose.
+
+**You need:** a Windows 10 or 11 PC that stays on, a Claude plan that includes
+Claude Code (Pro or Max), and Telegram on your phone. Optional: a free
+[Gemini key](https://aistudio.google.com/apikey) to read name cards.
+
+**Install:** open PowerShell (Start menu, type "PowerShell") and paste:
+
+```powershell
+irm https://project-alpha-dlz.pages.dev/kits/chief-of-staff/install.ps1 | iex
+```
+
+1. It installs Node.js and Claude Code if they are missing, and has you sign in to Claude once.
+2. It opens @BotFather in Telegram: send `/newbot`, pick a name, and paste the token it gives you.
+3. Choose which folder Claude may read (your Documents folder by default).
+4. Telegram opens your new bot. Press **Start**, and it is yours.
+
+It starts by itself whenever you log in. Run the same line again to update it;
+your settings are kept. Name cards come back as a contact file you tap to save;
+saving straight into Google Contacts is an optional extra explained in the
+[setup guide](/kits/chief-of-staff/README.md).
+
+Free for personal use; see the [licence](/kits/chief-of-staff/LICENSE).
