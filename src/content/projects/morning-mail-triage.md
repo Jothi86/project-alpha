@@ -1,0 +1,36 @@
+---
+title: Morning Mail Triage
+summary: Every morning at 8am, my official inbox is read, circulars are set aside, and reply drafts are waiting for me, with a one-message summary on my phone.
+status: live
+date: 2026-09-02
+tags: [email, gmail, automation, claude, telegram]
+techStack: [Python, Gmail API, Claude Code, Windows Task Scheduler, Telegram Bot API]
+---
+
+**The problem:** my official mailbox fills up overnight with a mix of circulars,
+agency updates and messages that need a reply. Sorting it was the first half hour
+of every day. On top of that, I work across three mailboxes (one official, two
+personal), and most assistants can only connect to one Google account at a time.
+
+**What it does:** at 8am every day, before I open my laptop:
+
+- It reads everything that arrived in the official inbox since 5pm the day before.
+- It sets aside circulars and newsletters (anything with an unsubscribe link), so
+  only real messages are left.
+- For each message that needs a reply, it writes a draft in the right language:
+  Malay mail gets a Malay reply, English gets English.
+- The drafts are saved in the mailbox, ready for me to check and send.
+- One Telegram message tells me what came in and which drafts are waiting.
+
+**How it works:** a small Python tool talks to the Gmail API and can read any of my
+three mailboxes, each with its own sign-in. A Windows scheduled task runs a script
+at 8am (or as soon as the PC wakes, if it was asleep). The script picks out the
+real messages and hands them to Claude, which writes the drafts and the summary.
+The script then saves the drafts and sends the Telegram message.
+
+**Guardrails:** it cannot send email. The tool has no send command at all, by
+design, so the worst it can do is write a draft I don't like. Claude gets the
+message text and nothing else: no tools, no files, no internet.
+
+**First run:** 11 messages came in overnight. 5 were circulars and were set aside,
+6 were read, and 3 needed replies, so 3 drafts were written.
