@@ -2,6 +2,7 @@
 title: Chief of Staff Bot
 summary: A private Telegram assistant that runs Claude on my own PC, so I can ask it to read files, check mail and file name cards from my phone.
 status: live
+cover: covers/chief-of-staff-bot.svg
 date: 2026-10-18
 tags: [telegram, claude, automation, name cards, phone]
 techStack: [Node.js, Telegram Bot API, Claude Code, Gemini, Google People API, Windows Task Scheduler]

@@ -2,6 +2,7 @@
 title: Brand Checker
 summary: Type a brand name and see at a glance which domains and social handles are still free, for the brand and every branch.
 status: live
+cover: covers/brand-checker.svg
 date: 2026-10-04
 tags: [branding, domains, social media, naming]
 kind: productivity

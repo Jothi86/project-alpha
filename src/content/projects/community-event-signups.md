@@ -2,6 +2,7 @@
 title: Community Event Sign-ups
 summary: A registration form in three languages, a printable QR poster and an automatic report after the event, set up in minutes for each new community event.
 status: live
+cover: covers/community-event-signups.svg
 date: 2026-09-24
 tags: [community, google forms, qr code, automation]
 techStack: [Google Apps Script, Google Forms, Google Sheets, Google Docs]

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0c0b24"/><stop offset="1" stop-color="#26176b"/></linearGradient>
+  <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#6d6bff" stop-opacity="0.45"/><stop offset="1" stop-color="#6d6bff" stop-opacity="0"/></radialGradient>
+  <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.6" fill="#fff" fill-opacity="0.07"/></pattern>
+  <filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity="0.45"/></filter>
+</defs>
+<rect width="1200" height="750" fill="url(#bg)"/>
+<rect width="1200" height="750" fill="url(#dots)"/>
+<ellipse cx="600" cy="375" rx="520" ry="330" fill="url(#glow)"/>
+
+<g filter="url(#sh)">
+  <rect x="290" y="165" width="620" height="84" rx="42" fill="#f5f5ff"/>
+  <circle cx="345" cy="205" r="18" fill="none" stroke="#335fff" stroke-width="6"/>
+  <path d="M358 219 L372 233" stroke="#335fff" stroke-width="7" stroke-linecap="round"/>
+  <text x="392" y="221" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#1a1a2e">yourbrand</text>
+  <rect x="590" y="186" width="4" height="44" fill="#335fff"/>
+  <rect x="770" y="179" width="124" height="56" rx="28" fill="#335fff"/>
+  <text x="832" y="216" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#fff" text-anchor="middle">Check</text>
+</g>
+<g filter="url(#sh)"><rect x="290" y="290" width="146" height="120" rx="18" fill="#0f3d2e" stroke="#22c55e" stroke-width="3"/>
+  <path d="M402 324 l8 8 l16 -18" fill="none" stroke="#22c55e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="308" y="382" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#f5f5f7">.com</text></g><g filter="url(#sh)"><rect x="448" y="290" width="146" height="120" rx="18" fill="#3d1214" stroke="#ef4444" stroke-width="3"/>
+  <path d="M560 312 l20 20 M580 312 l-20 20" stroke="#ef4444" stroke-width="6" stroke-linecap="round"/>
+  <text x="466" y="382" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#f5f5f7">.my</text></g><g filter="url(#sh)"><rect x="606" y="290" width="146" height="120" rx="18" fill="#0f3d2e" stroke="#22c55e" stroke-width="3"/>
+  <path d="M718 324 l8 8 l16 -18" fill="none" stroke="#22c55e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="624" y="382" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#f5f5f7">.com.my</text></g><g filter="url(#sh)"><rect x="764" y="290" width="146" height="120" rx="18" fill="#0f3d2e" stroke="#22c55e" stroke-width="3"/>
+  <path d="M876 324 l8 8 l16 -18" fill="none" stroke="#22c55e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="782" y="382" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#f5f5f7">Instagram</text></g><g filter="url(#sh)"><rect x="290" y="430" width="146" height="120" rx="18" fill="#3d1214" stroke="#ef4444" stroke-width="3"/>
+  <path d="M402 452 l20 20 M422 452 l-20 20" stroke="#ef4444" stroke-width="6" stroke-linecap="round"/>
+  <text x="308" y="522" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#f5f5f7">TikTok</text></g><g filter="url(#sh)"><rect x="448" y="430" width="146" height="120" rx="18" fill="#0f3d2e" stroke="#22c55e" stroke-width="3"/>
+  <path d="M560 464 l8 8 l16 -18" fill="none" stroke="#22c55e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="466" y="522" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#f5f5f7">YouTube</text></g><g filter="url(#sh)"><rect x="606" y="430" width="146" height="120" rx="18" fill="#26262e" stroke="#7c7c8a" stroke-width="3"/>
+  <circle cx="728" cy="462" r="5" fill="#7c7c8a"/><circle cx="712" cy="462" r="5" fill="#7c7c8a"/><circle cx="744" cy="462" r="5" fill="#7c7c8a" opacity="0"/>
+  <text x="624" y="522" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#f5f5f7">X</text></g><g filter="url(#sh)"><rect x="764" y="430" width="146" height="120" rx="18" fill="#0f3d2e" stroke="#22c55e" stroke-width="3"/>
+  <path d="M876 464 l8 8 l16 -18" fill="none" stroke="#22c55e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="782" y="522" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#f5f5f7">LinkedIn</text></g>
+</svg>

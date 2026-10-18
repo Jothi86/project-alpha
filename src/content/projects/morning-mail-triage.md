@@ -2,6 +2,7 @@
 title: Morning Mail Triage
 summary: Every morning at 8am, my official inbox is read, circulars are set aside, and reply drafts are waiting for me, with a one-message summary on my phone.
 status: live
+cover: covers/morning-mail-triage.svg
 date: 2026-09-02
 tags: [email, gmail, automation, claude, telegram]
 techStack: [Python, Gmail API, Claude Code, Windows Task Scheduler, Telegram Bot API]

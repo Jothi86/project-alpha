@@ -2,6 +2,7 @@
 title: Name Card Scanner
 summary: Photograph a name card and the contact lands in your phone, saved to your Google Contacts or as a contact file. No typing.
 status: live
+cover: covers/name-card-scanner.svg
 date: 2026-10-03
 tags: [contacts, name cards, ocr, telegram, phone]
 kind: productivity

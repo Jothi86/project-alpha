@@ -2,6 +2,7 @@
 title: Penang Radar
 summary: A short email at 8.05am every day with the three Penang stories from yesterday that matter most for infrastructure, transport and the state government.
 status: live
+cover: covers/penang-radar.svg
 date: 2026-09-02
 tags: [news, penang, email, automation, claude]
 techStack: [Claude Code routines, Gmail, web search]
