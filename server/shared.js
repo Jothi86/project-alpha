@@ -4,7 +4,14 @@
 //   GEMINI_API_KEY  secret: reads the cards
 //   TOKEN_KEY       secret: base64 32-byte AES key that encrypts bot tokens
 
-export const DAILY_LIMIT = 50;
+// Free scans per visitor (or visitor bot) per day on the site's free Gemini key.
+export const DAILY_LIMIT = 5;
+// Free scans for all visitors together per day. The free key only allows so
+// many reads a day; this keeps the rest for the owner. Past either limit,
+// visitors are asked to add their own free key.
+export const PUBLIC_DAILY_CAP = 40;
+
+export const NEED_KEY = 'need_key';
 
 // The site owner scans without a limit. The page sends the owner key (kept in
 // the owner's browser) as X-Owner-Key; only its SHA-256 lives here.
@@ -29,13 +36,26 @@ const today = () => new Date().toISOString().slice(0, 10);
 // (countUse), so a failed read never uses up the allowance.
 export async function underLimit(kv, who) {
   const used = Number((await kv.get(`rl:${who}:${today()}`)) || 0);
-  return used < DAILY_LIMIT;
+  const all = Number((await kv.get(`rl:public:${today()}`)) || 0);
+  return used < DAILY_LIMIT && all < PUBLIC_DAILY_CAP;
 }
 
 export async function countUse(kv, who) {
-  const key = `rl:${who}:${today()}`;
-  const used = Number((await kv.get(key)) || 0);
-  await kv.put(key, String(used + 1), { expirationTtl: 60 * 60 * 48 });
+  for (const key of [`rl:${who}:${today()}`, `rl:public:${today()}`]) {
+    const used = Number((await kv.get(key)) || 0);
+    await kv.put(key, String(used + 1), { expirationTtl: 60 * 60 * 48 });
+  }
+}
+
+// A visitor's own Gemini key: the right shape, and Google accepts it.
+// Older keys look like AIza…, newer ones like AQ.A….
+export const KEY_SHAPE = /^(AIza[0-9A-Za-z_-]{35}|AQ\.[0-9A-Za-z_.-]{30,100})$/;
+export async function keyWorks(key) {
+  if (!KEY_SHAPE.test(key)) return false;
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', {
+    headers: { 'x-goog-api-key': key },
+  }).catch(() => null);
+  return !!res?.ok;
 }
 
 export function toBase64(buffer) {

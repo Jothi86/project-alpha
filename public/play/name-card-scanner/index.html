@@ -233,6 +233,20 @@
   </div>
 
   <section style="margin-top:24px">
+    <details id="key">
+      <summary>Scan with no daily limit</summary>
+      <div id="key-off">
+        <p class="muted" style="margin-top:0">Free scans here are limited each day. Add your own free Gemini key from Google and your scans go straight from this phone to Google, with no limit from this site.</p>
+        <div id="key-prompt"></div>
+      </div>
+      <div id="key-on" hidden>
+        <p style="margin-top:0">Scanning with your own free Gemini key. It is kept only on this device.</p>
+        <button id="key-remove">Remove key</button>
+      </div>
+    </details>
+  </section>
+
+  <section style="margin-top:12px">
     <details id="tg">
       <summary>Use it from your own Telegram bot</summary>
       <div id="tg-off">
@@ -267,7 +281,7 @@
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script type="module">
-import { describe, toVcard, isOtherSide, mergeCards } from './cardread.js';
+import { readCard, describe, toVcard, isOtherSide, mergeCards } from './cardread.js';
 import { saveCard } from './contacts.js';
 
 const GOOGLE_CLIENT_ID = '1057352117297-rgivh3hrb8u71lj8guq0o4mqpo632206.apps.googleusercontent.com';
@@ -509,6 +523,96 @@ async function shrink(file) {
   return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
 }
 
+// --- reading: the visitor's own key (phone -> Google), else the site's free scans ---
+
+// Older keys look like AIza…, newer ones like AQ.A….
+const KEY_SHAPE = /^(AIza[0-9A-Za-z_-]{35}|AQ\.[0-9A-Za-z_.-]{30,100})$/;
+const needKey = (message) => Object.assign(new Error(message), { code: 'need_key' });
+
+async function readImage(image) {
+  const own = store.get('ncs.gemini');
+  if (own) {
+    try {
+      return await readCard({ apiKey: own, base64: image });
+    } catch (err) {
+      if (err.code === 'quota') throw new Error('Your free Gemini allowance for today is used up. It resets tomorrow.');
+      if (err.code === 'badkey') { setKey(null); throw needKey('Google no longer accepts your key. Add it again:'); }
+      throw new Error(`Could not read the card: ${err.message.replace(/^card reader failed: /, '')}`);
+    }
+  }
+  const res = await fetch('/api/read-card', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(store.get('ncs.owner') ? { 'X-Owner-Key': store.get('ncs.owner') } : {}),
+    },
+    body: JSON.stringify({ image, mimeType: 'image/jpeg' }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (data.code === 'need_key') throw needKey(data.error);
+  if (!res.ok) throw new Error(data.error || 'The card reader is not answering. Try again.');
+  return data.cards || [];
+}
+
+async function keyWorks(key) {
+  if (!KEY_SHAPE.test(key)) return false;
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', {
+    headers: { 'x-goog-api-key': key },
+  }).catch(() => null);
+  return !!res?.ok;
+}
+
+function setKey(key) {
+  if (key) store.set('ncs.gemini', key); else store.del('ncs.gemini');
+  showKey();
+}
+
+function showKey() {
+  const has = !!store.get('ncs.gemini');
+  $('key-off').hidden = has;
+  $('key-on').hidden = !has;
+}
+
+// Get a key from Google AI Studio, copy it, tap Paste. Typing it in is the fallback.
+function keyPrompt(container, onSaved) {
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <div class="row" style="margin-top:10px">
+      <a class="btn primary" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">1. Get my free key</a>
+      <button data-paste>2. Paste my key</button>
+    </div>
+    <p class="muted" style="margin-bottom:0">On Google's page, sign in, tap <strong>Create API key</strong> and copy it. Then come back and tap Paste. The key stays on this device.</p>
+    <div class="row" data-manual hidden style="margin-top:10px">
+      <input type="password" placeholder="Paste key here" autocomplete="off">
+      <button class="primary" data-save>Save</button>
+    </div>
+    <p class="status err" data-err hidden></p>`;
+  container.append(el);
+  const err = (t) => { const p = el.querySelector('[data-err]'); p.hidden = !t; p.textContent = t || ''; };
+  const save = async (raw) => {
+    const key = String(raw || '').trim();
+    err('');
+    if (!(await keyWorks(key))) {
+      el.querySelector('[data-manual]').hidden = false;
+      return err(KEY_SHAPE.test(key)
+        ? 'Google did not accept that key. Copy it again and tap Paste.'
+        : 'No key found on the clipboard. Copy it on Google\'s page and tap Paste, or paste it in the box.');
+    }
+    setKey(key);
+    onSaved?.();
+  };
+  el.querySelector('[data-paste]').onclick = async () => {
+    let text = '';
+    try { text = await navigator.clipboard.readText(); } catch {}
+    save(text);
+  };
+  el.querySelector('[data-save]').onclick = () => save(el.querySelector('input').value);
+}
+
+keyPrompt($('key-prompt'));
+$('key-remove').onclick = () => setKey(null);
+showKey();
+
 async function handlePhoto(file) {
   const box = document.createElement('div');
   box.className = 'result';
@@ -517,21 +621,14 @@ async function handlePhoto(file) {
 
   let cards;
   try {
-    const image = await shrink(file);
-    const res = await fetch('/api/read-card', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(store.get('ncs.owner') ? { 'X-Owner-Key': store.get('ncs.owner') } : {}),
-      },
-      body: JSON.stringify({ image, mimeType: 'image/jpeg' }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'The card reader is not answering. Try again.');
-    cards = data.cards || [];
+    cards = await readImage(await shrink(file));
   } catch (err) {
     box.innerHTML = '<div class="status err"></div>';
     box.firstChild.textContent = err.message;
+    // Out of free scans: offer the visitor's own key, then retry this photo.
+    if (err.code === 'need_key') {
+      keyPrompt(box, () => { box.remove(); handleFiles([file]); });
+    }
     return;
   }
 

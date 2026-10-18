@@ -3,7 +3,11 @@
 // (reading). A copy lives in the chief-of-staff bot as cardread.mjs — keep in step.
 
 // First is the stable pick; the rest are tried when it is overloaded.
-const MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-lite-latest'];
+// 3.8 is last: it is overloaded most of the time and each refusal costs ~3s.
+const MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-lite-latest', 'gemini-3.8-flash'];
+// Reading a card needs no reasoning; thinking added ~2.5s a card for the same
+// result. 3.8 does not accept 'minimal', so it gets 'low'.
+const THINKING = { 'gemini-3.8-flash': 'low' };
 const RETRY_STATUS = new Set([429, 500, 502, 503, 504]);
 
 const PROMPT = `You read business / name cards from a photo.
@@ -84,7 +88,7 @@ const GOOGLE = 'https://generativelanguage.googleapis.com/v1beta';
 // send: how the request is made (default fetch); the functions pass a relay
 // that makes the call from a fixed US location.
 export async function readCard({ apiKey, base64, mimeType = 'image/jpeg', baseUrl = GOOGLE, send = fetch }) {
-  const body = JSON.stringify({
+  const bodyFor = (model) => JSON.stringify({
     contents: [
       { role: 'user', parts: [{ inlineData: { mimeType, data: base64 } }, { text: PROMPT }] },
     ],
@@ -92,18 +96,20 @@ export async function readCard({ apiKey, base64, mimeType = 'image/jpeg', baseUr
       temperature: 0,
       responseMimeType: 'application/json',
       responseSchema: SCHEMA,
+      thinkingConfig: { thinkingLevel: THINKING[model] || 'minimal' },
     },
   });
 
   let res;
   let data;
   for (let i = 0; i < MODELS.length; i++) {
-    if (i > 0) await new Promise((r) => setTimeout(r, 1500 * i));
+    // An overloaded model is skipped, not waited on: try the next one almost at once.
+    if (i > 0) await new Promise((r) => setTimeout(r, 250));
     const url = `${baseUrl.replace(/\/$/, '')}/models/${MODELS[i]}:generateContent`;
     res = await send(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body,
+      body: bodyFor(MODELS[i]),
     });
     data = await res.json().catch(() => ({}));
     if (res.ok || !RETRY_STATUS.has(res.status)) break;
@@ -113,7 +119,11 @@ export async function readCard({ apiKey, base64, mimeType = 'image/jpeg', baseUr
     if (/location is not supported/i.test(msg)) {
       throw new Error('the card reader is not reachable from this server region right now. Please try again in a minute.');
     }
-    throw new Error(`card reader failed: ${msg}`);
+    const err = new Error(`card reader failed: ${msg}`);
+    // quota: the key's free allowance is used up. badkey: the key is wrong.
+    if (res.status === 429) err.code = 'quota';
+    else if (/api key not valid|API_KEY_INVALID|permission denied|has been suspended/i.test(msg)) err.code = 'badkey';
+    throw err;
   }
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
   let parsed;

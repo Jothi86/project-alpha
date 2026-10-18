@@ -17,7 +17,7 @@
 <main>
   <p><a href="./">← Name Card Scanner</a></p>
   <h1>Privacy</h1>
-  <p>Last updated 3 October 2026.</p>
+  <p>Last updated 18 October 2026.</p>
 
   <h2>Photos</h2>
   <p>When you take or upload a photo, it is shrunk in your browser and sent to our card reader, which passes it to Google's Gemini API to read the text. The photo is not saved by this site. The details read from the card are sent back to your browser and not kept.</p>
@@ -35,6 +35,9 @@
 
   <h2>Telegram bots</h2>
   <p>If you connect your own Telegram bot, its token is stored encrypted so the bot can reply to you. Only the chat that finishes the setup can use it. Photos sent to the bot pass through the card reader as above and are not saved. Disconnecting deletes the stored token.</p>
+
+  <h2>Your own Gemini key</h2>
+  <p>If you add your own Gemini key on the page, it is kept only in your browser, and your photos go straight from your browser to Google's Gemini API under your own key; this site does not see them. If you send your key to your connected Telegram bot, it is stored encrypted with the bot and used only to read the cards you send it. <em>Remove key</em> on the page, or <code>/forgetkey</code> in the bot, deletes it.</p>
 
   <h2>Usage limits</h2>
   <p>To keep the service free, each visitor and each connected bot can read a limited number of cards a day. A short-lived counter keyed to your IP address or bot is kept for up to two days for this purpose only.</p>

@@ -5,13 +5,21 @@
 import {
   readCard, describe, toVcard, isOtherSide, mergeCards,
 } from '../../../public/play/name-card-scanner/cardread.js';
-import { tg, tgSendFile, decrypt, toBase64, underLimit, countUse, geminiSend, DAILY_LIMIT } from '../../../server/shared.js';
+import {
+  tg, tgSendFile, encrypt, decrypt, toBase64, underLimit, countUse, geminiSend, KEY_SHAPE, keyWorks,
+} from '../../../server/shared.js';
 import { disconnect } from './connect.js';
 
 const HELP =
   'Send me a photo of a name card (or several cards in one photo) and I will ' +
   'send back a contact file. Tap it to save the contact to your phone. ' +
   'Add a caption to note where you met. /disconnect to unlink this bot.';
+
+const GET_KEY =
+  'To keep scanning with no daily limit, use your own free Gemini key:\n' +
+  '1. Open https://aistudio.google.com/apikey and sign in with Google.\n' +
+  '2. Tap "Create API key" and copy it.\n' +
+  '3. Paste it here as a message.';
 
 export async function onRequestPost({ request, env, params }) {
   const raw = await env.CARDS_KV.get(`bot:${params.id}`);
@@ -55,11 +63,26 @@ async function handle(env, id, bot, message) {
     return disconnect(env, id, bot);
   }
 
+  // The visitor's own Gemini key, pasted into the chat.
+  if (KEY_SHAPE.test(text)) {
+    await tg(token, 'deleteMessage', { chat_id: chatId, message_id: message.message_id }).catch(() => {});
+    if (!(await keyWorks(text))) return say('Google did not accept that key. Copy it again from https://aistudio.google.com/apikey');
+    bot.geminiKey = await encrypt(env, text);
+    await env.CARDS_KV.put(`bot:${id}`, JSON.stringify(bot));
+    return say('Key saved. Your scans now use your own free allowance, with no daily limit here. /forgetkey to remove it.');
+  }
+  if (text === '/forgetkey') {
+    delete bot.geminiKey;
+    await env.CARDS_KV.put(`bot:${id}`, JSON.stringify(bot));
+    return say('Key removed. You are back on the free daily scans.');
+  }
+
   const image = imageOf(message);
   if (!image) return say(HELP);
 
-  if (!(await underLimit(env.CARDS_KV, `bot:${id}`))) {
-    return say(`Daily limit reached (${DAILY_LIMIT} cards a day). Try again tomorrow.`);
+  const ownKey = bot.geminiKey ? await decrypt(env, bot.geminiKey) : null;
+  if (!ownKey && !(await underLimit(env.CARDS_KV, `bot:${id}`))) {
+    return say(`Free scans for today are used up.\n\n${GET_KEY}`);
   }
 
   await tg(token, 'sendChatAction', { chat_id: chatId, action: 'upload_document' }).catch(() => {});
@@ -69,13 +92,13 @@ async function handle(env, id, bot, message) {
     const res = await fetch(`https://api.telegram.org/file/bot${token}/${file.file_path}`);
     if (!res.ok) throw new Error('could not download the photo');
     const cards = await readCard({
-      apiKey: env.GEMINI_API_KEY,
+      apiKey: ownKey || env.GEMINI_API_KEY,
       baseUrl: env.GEMINI_BASE_URL || undefined,
       send: geminiSend(env),
       base64: toBase64(await res.arrayBuffer()),
       mimeType: image.mimeType,
     });
-    await countUse(env.CARDS_KV, `bot:${id}`);
+    if (!ownKey) await countUse(env.CARDS_KV, `bot:${id}`);
     if (!cards.length) {
       return say('I could not find a name card in that photo. Try again with the card filling the frame.');
     }
@@ -110,6 +133,16 @@ async function handle(env, id, bot, message) {
       (cards.length === 1 ? ' Two-sided card? Send the back next.' : ''));
     await sendFile(cards);
   } catch (err) {
+    if (err.code === 'quota') {
+      return say(ownKey
+        ? 'Your free Gemini allowance for today is used up. It resets tomorrow.'
+        : `Free scans for today are used up.\n\n${GET_KEY}`);
+    }
+    if (err.code === 'badkey' && ownKey) {
+      delete bot.geminiKey;
+      await env.CARDS_KV.put(`bot:${id}`, JSON.stringify(bot));
+      return say(`Google no longer accepts your key, so I removed it.\n\n${GET_KEY}`);
+    }
     await say(`Something went wrong with that card: ${err.message}`);
   }
 }
