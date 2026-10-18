@@ -1,0 +1,12 @@
+Every morning, go through my Gmail inbox and prepare reply drafts. Never send any email.
+
+1. Look at the emails that arrived in my inbox in the last 24 hours.
+2. Skip newsletters, circulars, adverts and automatic notifications (anything with an unsubscribe link, or sent from a no-reply address).
+3. For each remaining email that needs an answer from me, create a Gmail DRAFT reply in the same thread:
+   - Write in the same language the sender used. Malay gets a Malay reply, English gets English.
+   - Keep it short, polite and {{TONE}}.
+   - If you don't have a fact you need, write [CHECK: what is missing] in the draft instead of guessing.
+   - Sign off as: {{NAME}}
+4. Do not send, delete, archive or label anything. Only create drafts.
+
+When you finish, write a short summary: how many emails came in, how many you skipped, and one line per draft (who it is to and what it says).

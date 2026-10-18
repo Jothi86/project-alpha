@@ -44,4 +44,51 @@ const demoHref = resolveLink(item.data.links.demo, base);
   <div class="prose">
     <Content />
   </div>
+
+  <script is:inline>
+    // Copy buttons on code boxes, and "fill-in" boxes: a template file whose
+    // {{KEY}} gaps are filled from the inputs above it, then copied in one tap.
+    (function () {
+      function copyBtn(pre, label) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'copy-btn'; b.textContent = label || 'Copy';
+        b.onclick = function () {
+          var text = pre.textContent;
+          var done = function () { b.textContent = 'Copied ✓'; setTimeout(function () { b.textContent = label || 'Copy'; }, 2000); };
+          if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+          function fallback() {
+            var r = document.createRange(); r.selectNodeContents(pre);
+            var s = getSelection(); s.removeAllRanges(); s.addRange(r);
+            document.execCommand('copy'); done();
+          }
+        };
+        return b;
+      }
+      document.querySelectorAll('.prose pre').forEach(function (pre) {
+        if (pre.closest('.fill')) return;
+        var wrap = document.createElement('div'); wrap.className = 'pre-wrap';
+        pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre); wrap.appendChild(copyBtn(pre));
+      });
+      document.querySelectorAll('.fill').forEach(function (box) {
+        var pre = document.createElement('pre');
+        pre.textContent = 'Loading…';
+        var tpl = '';
+        var inputs = box.querySelectorAll('[data-key]');
+        function render() {
+          var out = tpl;
+          inputs.forEach(function (i) {
+            var v = i.value.trim() || i.getAttribute('data-default') || '{{' + i.dataset.key + '}}';
+            out = out.split('{{' + i.dataset.key + '}}').join(v.replace(/'/g, '’'));
+          });
+          pre.textContent = out;
+        }
+        inputs.forEach(function (i) { i.addEventListener('input', render); });
+        var row = document.createElement('div'); row.className = 'fill-row';
+        row.appendChild(copyBtn(pre, box.dataset.copy));
+        box.appendChild(row); box.appendChild(pre);
+        fetch(box.dataset.src).then(function (r) { return r.text(); }).then(function (t) { tpl = t; render(); },
+          function () { pre.textContent = 'Could not load. Refresh the page.'; });
+      });
+    })();
+  </script>
 </Base>

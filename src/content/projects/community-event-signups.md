@@ -27,8 +27,51 @@ one go. A small Python script turns the form's link into the QR poster as a Word
 document. A one-off timer in Apps Script runs the export the day after the event,
 then removes itself, so nothing is left running.
 
-**Reusing it:** for the next event, change the title and date, run the script, and
-make the poster from the new link. The whole setup takes a few minutes instead of
-an afternoon.
+**First use:** the Mid-Autumn Festival on 26 September 2026. The report filed
+itself the next morning: 188 households, 480 people.
 
-**First use:** the Mid-Autumn Festival on 26 September 2026.
+## Make your own
+
+Free. All you need is a Google account (Gmail) and a computer. It takes about five
+minutes, and everything is created in your own Google Drive. Nobody else sees
+your residents' details.
+
+**1. Fill in your event and copy the script.**
+
+<div class="fill" data-src="/kits/event-signup/event-signup.gs" data-copy="Copy my script">
+<label>Event name <input data-key="EVENT" placeholder="Mid-Autumn Festival 2026"></label>
+<label>Event date <input data-key="DATE" type="date"></label>
+<label>Organiser <input data-key="ORGANISER" placeholder="MPKK Taman Kota Permai"></label>
+</div>
+
+**2. Open [script.new](https://script.new)** in a new tab. Sign in with the
+Google account that should own the form.
+
+**3. Replace what's there.** Click inside the code area, press **Ctrl+A** (select
+all), then **Ctrl+V** (paste your script). Press **Ctrl+S** to save, and give it any name.
+
+**4. Click Run** (the ▶ button at the top). Google asks for permission:
+
+- Click **Review permissions** and choose your account.
+- You'll see "Google hasn't verified this app". That's normal, because the app is
+  your own script. Click **Advanced**, then **Go to (your project name)**.
+- Click **Allow**.
+
+**5. Check your email.** Within a minute you get one message with everything:
+
+- the sign-up link to share in your WhatsApp group;
+- the QR poster (open it, then **File > Print**);
+- the answers sheet, where you can watch registrations come in.
+
+**6. Do nothing after the event.** At 9am the next morning the report arrives by
+email, and an Excel copy is saved in the event folder.
+
+**Next event:** fill in the boxes again, copy, and start from step 2 with a new
+script.new. Each event gets its own form, folder and report.
+
+**Something went wrong?**
+
+- *"Fill in EVENT_NAME…"*: you pasted the script before filling in the boxes.
+  Fill them in, copy again, and paste over it.
+- *Want the report early?* In the script, pick **sendReport** from the drop-down
+  next to Run, then click Run.

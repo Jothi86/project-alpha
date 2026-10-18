@@ -1,0 +1,14 @@
+Every morning, find the three most important news stories about {{AREA}} from yesterday and email me a short summary.
+
+How to choose:
+- Search the news for {{AREA}} stories published yesterday.
+- Put these first: {{TOPICS}}. General news comes after.
+- Prefer stories that may need action from someone in public service or the community.
+
+How to write it:
+- Subject: "{{AREA}} Radar - " followed by yesterday's date.
+- Plain text. For each story: a one-line headline, two or three sentences on what happened and why it matters, and the source link.
+- If yesterday was quiet, say so in one line instead of filling space.
+- End with one sentence on whether any of it needs action from me.
+
+Send the email to {{EMAIL}} using Gmail. Send only this one email.

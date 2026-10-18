@@ -4,7 +4,7 @@
 // paid check later: look up the X-Kit-Key header before handing anything out.
 // Free for now.
 
-const TEXT = /\.(ps1|mjs|js|json|md|txt|html|sh)$|(^|\/)LICENSE$/;
+const TEXT = /\.(ps1|mjs|js|json|md|txt|html|sh|gs)$|(^|\/)LICENSE$/;
 
 export async function onRequest({ request, env }) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {

@@ -34,3 +34,38 @@ message text and nothing else: no tools, no files, no internet.
 
 **First run:** 11 messages came in overnight. 5 were circulars and were set aside,
 6 were read, and 3 needed replies, so 3 drafts were written.
+
+## Make your own
+
+My version runs on my PC because it reads three mailboxes. For one Gmail inbox,
+there's a much simpler way that runs in the cloud. You need a paid Claude plan
+(Pro or Max). No code, nothing to install.
+
+**1. Fill in the boxes and copy the instructions.**
+
+<div class="fill" data-src="/kits/routines/mail-triage.txt" data-copy="Copy instructions">
+<label>Sign your drafts as <input data-key="NAME" placeholder="Your name and title"></label>
+<label>Tone <input data-key="TONE" placeholder="professional" data-default="professional"></label>
+</div>
+
+**2. Connect Gmail to Claude (once).** Open
+[claude.ai/customize/connectors](https://claude.ai/customize/connectors), find
+**Gmail**, click **Connect**, and sign in with the inbox you want sorted.
+
+**3. Create the routine.** Open [claude.ai/code/routines](https://claude.ai/code/routines)
+and click **New routine**. Then:
+
+- **Name:** anything, e.g. "Morning Mail".
+- **Instructions:** paste what you copied in step 1.
+- **Repositories:** skip. It doesn't need one.
+- **Select a trigger:** choose **Schedule**, then **Weekdays**, and pick a time a few
+  minutes past the hour (e.g. 7:55).
+- **Connectors** (bottom of the form): keep **Gmail**, and remove the rest.
+
+Click **Create**, then open the routine and click **Run now** to try it. When it finishes, open Gmail's **Drafts**
+folder: the replies are waiting there for you to check and send.
+
+**The difference from my version:** the instructions tell Claude never to send,
+but Claude's Gmail connection can send mail if it chooses to. My PC version simply
+has no way to send. Read the first few runs, and if a draft is wrong, add a line to
+the instructions saying what to do instead.

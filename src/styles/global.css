@@ -329,3 +329,24 @@ footer.site {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* Copy buttons and fill-in boxes on project pages */
+.pre-wrap { position: relative; }
+.copy-btn {
+  background: var(--cobalt); color: #fff; border: 0; border-radius: 999px;
+  font: 700 0.85rem var(--font); padding: 0.45rem 1rem; cursor: pointer;
+}
+.copy-btn:hover { background: #2650e0; }
+.pre-wrap .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; }
+.fill {
+  background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1rem; margin: 1rem 0;
+}
+.fill label { display: block; font-weight: 600; margin-bottom: 0.75rem; }
+.fill input {
+  display: block; width: 100%; box-sizing: border-box; margin-top: 0.3rem;
+  background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.6rem 0.75rem; font: 1rem var(--font);
+}
+.fill-row { margin: 0.5rem 0; }
+.fill pre { max-height: 14rem; overflow: auto; font-size: 0.8rem; white-space: pre-wrap; }
