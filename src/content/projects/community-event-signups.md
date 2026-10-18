@@ -24,10 +24,6 @@ work, and the numbers end up scattered across phones and spreadsheets.
 **How it works:** one Google Apps Script builds the form, its responses sheet and
 the QR poster (a Google Doc) in one go. A one-off timer runs the export the day
 after the event, then removes itself, so nothing is left running.
-
-**First use:** a community festival. The report filed itself the next morning:
-188 households, 480 people.
-
 ## Make your own
 
 Free. All you need is a Google account (Gmail) and a computer. It takes about five
